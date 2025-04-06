@@ -11,7 +11,7 @@ import java.util.function.Consumer
 /**
  * Default collection writer.
  */
-class DefaultCollectionWriter : AbstractWrite() {
+class BinCollectionWriter : AbstractWrite() {
 
     override fun writeCollection(collection: Collection<DatabaseRecord>, consumer: Consumer<Document>): ByteArray {
         val byteStream = ByteArrayOutputStream()

@@ -7,8 +7,8 @@ import net.cakemc.database.collection.DocumentCollection
 import net.cakemc.database.filter.Filters
 import net.cakemc.database.serial.AbstractRead
 import net.cakemc.database.serial.AbstractWrite
-import net.cakemc.database.serial.impl.DefaultCollectionReader
-import net.cakemc.database.serial.impl.DefaultCollectionWriter
+import net.cakemc.database.serial.impl.BinCollectionReader
+import net.cakemc.database.serial.impl.BinCollectionWriter
 import net.cakemc.skrilla.database.CollectionInfo
 import net.cakemc.skrilla.database.Index
 import net.cakemc.skrilla.database.IndexEntry
@@ -34,8 +34,8 @@ open class DefaultDatabase(val folder: Path) : AbstractDatabase() {
 
     private val databaseFolder = folder.apply { Files.createDirectories(folder) }
 
-    private val collectionWriter: AbstractWrite = DefaultCollectionWriter()
-    private val collectionReader: AbstractRead = DefaultCollectionReader()
+    private val collectionWriter: AbstractWrite = BinCollectionWriter()
+    private val collectionReader: AbstractRead = BinCollectionReader()
 
     private val fileUtility: FileUtility = FileUtilityFactory.create()
 
@@ -319,7 +319,7 @@ open class DefaultDatabase(val folder: Path) : AbstractDatabase() {
             val collectionName = parts[0]
             val documentId = parts[1].toLong()
             val base64Data = parts[2]
-            val data = java.util.Base64.getDecoder().decode(base64Data)
+            val data = Base64.getDecoder().decode(base64Data)
             val document = collectionReader.readElement(DataInputStream(ByteArrayInputStream(data)))
 
             val collection = getCollection(collectionName)

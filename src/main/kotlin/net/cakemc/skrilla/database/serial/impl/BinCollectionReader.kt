@@ -11,7 +11,7 @@ import java.util.*
 /**
  * Default collection reader.
  */
-class DefaultCollectionReader : AbstractRead() {
+class BinCollectionReader : AbstractRead() {
 
     override fun read(data: ByteArray?): Collection<DatabaseRecord> {
         val byteStream = ByteArrayInputStream(data)
