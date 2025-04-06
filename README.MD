@@ -6,8 +6,8 @@ Feature-list:
 - WAL - Crash Recovery
 - Document Indexing and Memory Chunk writing
 - Async Encrypted & Compressed TCP-Networking
-- MemoryTable Flushing Gate 
-- Compressed Chunk Collection writer
+- MemoryTable
+- Compressed Data-Chunk base collections
 - Supported Compressions: Zlib, Zstd, Gzip
 - Native File- Read/Writing (C-Interop)
 - Native Indexing algorithms (C-Interop)
