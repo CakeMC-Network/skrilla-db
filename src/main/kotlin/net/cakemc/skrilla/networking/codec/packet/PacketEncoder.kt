@@ -8,6 +8,7 @@ import net.cakemc.skrilla.networking.packet.Packet
 class PacketEncoder: MessageToByteEncoder<Packet>() {
 
     override fun encode(p0: ChannelHandlerContext, packet: Packet, input: ByteBuf) {
+        input.writeInt(packet.packetId().ordinal)
         packet.write(input)
     }
 

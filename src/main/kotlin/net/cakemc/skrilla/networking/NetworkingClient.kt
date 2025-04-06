@@ -26,7 +26,7 @@ import javax.crypto.SecretKey
 class NetworkingClient(
     val secretKey: SecretKey,
     val clientHandler: ClientHandler,
-    val packetRegistry: PacketRegistry
+    val packetRegistry: PacketRegistry = PacketRegistry()
 ) {
 
     var group: EventLoopGroup? = null
@@ -40,6 +40,9 @@ class NetworkingClient(
 
     var channelFuture: ChannelFuture? = null
         private set
+
+    val activeChannel: Channel?
+        get() = channelFuture?.channel()
 
     /**
      * Initializes the networking client by setting up the group and determining the channel type
@@ -92,6 +95,8 @@ class NetworkingClient(
             group!!.shutdownGracefully()
         }
     }
+
+
 
     fun disconnect() {
         channelFuture!!.channel().close().syncUninterruptibly()

@@ -26,7 +26,7 @@ import javax.crypto.SecretKey
 class NetworkingServer(
     val secretKey: SecretKey,
     val clientHandler: ClientHandler,
-    val packetRegistry: PacketRegistry
+    val packetRegistry: PacketRegistry = PacketRegistry()
 ) {
 
     /**

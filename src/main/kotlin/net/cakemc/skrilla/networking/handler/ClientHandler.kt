@@ -1,7 +1,6 @@
 package net.cakemc.skrilla.networking.handler
 
 import io.netty.channel.Channel
-import io.netty.channel.ChannelHandlerContext
 import net.cakemc.skrilla.networking.packet.Packet
 import net.cakemc.skrilla.networking.packet.PacketFuture
 import net.cakemc.skrilla.networking.packet.PacketIdentity
@@ -12,7 +11,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 class ClientHandler {
 
-    val contextMap: MutableMap<String, ChannelHandlerContext> = ConcurrentHashMap()
+    val contextMap: MutableMap<String, Channel> = ConcurrentHashMap()
     val pendingPackets: MutableMap<UUID, PacketFuture> = ConcurrentHashMap()
 
     val handlerMap: MutableMap<PacketIdentity, MutableList<PacketHandler>> = ConcurrentHashMap()
@@ -35,7 +34,7 @@ class ClientHandler {
         }
     }
 
-    fun getChannel(name: String): ChannelHandlerContext? {
+    fun getChannel(name: String): Channel? {
         return contextMap.get(name)
     }
 
@@ -47,11 +46,11 @@ class ClientHandler {
         return contextMap.keys
     }
 
-    fun getChannelList(): MutableCollection<ChannelHandlerContext> {
+    fun getChannelList(): MutableCollection<Channel> {
         return contextMap.values
     }
 
-    fun registerChannel(name: String, context: ChannelHandlerContext) {
+    fun registerChannel(name: String, context: Channel) {
         this.contextMap.put(name, context)
     }
 
@@ -63,7 +62,7 @@ class ClientHandler {
         this.contextMap.clear()
     }
 
-    fun getChannelNameByContext(ctx: ChannelHandlerContext): String? {
+    fun getChannelNameByContext(ctx: Channel): String? {
         val entry = this.contextMap.entries.stream()
             .filter {it.value.equals(ctx)}.findFirst().orElse(null)
 
@@ -103,7 +102,7 @@ class ClientHandler {
     }
 
     fun sendToAllSync(packet: Packet) {
-        this.contextMap.values.forEach { it.channel().writeAndFlush(packet) }
+        this.contextMap.values.forEach { it.writeAndFlush(packet) }
     }
 
     fun sendPacketAsync(name: String, packet: Packet) {
@@ -137,7 +136,7 @@ class ClientHandler {
     fun sendToAllAsync(packet: Packet) {
         this.contextMap.values.forEach { context ->
             Thread.ofVirtual().start {
-                context.channel().writeAndFlush(packet)
+                context.writeAndFlush(packet)
             }
         }
     }

@@ -10,11 +10,8 @@ abstract class Packet(
 ) {
 
     fun read(input: ByteBuf) {
-        val most = readLong(input)
-        val least = readLong(input)
-
-        this.packetType = PacketType.entries.toTypedArray()[input.readInt()]
-        this.responseUUID = UUID(most, least)
+        this.responseUUID = UUID.fromString(readString(input))
+        this.packetType = PacketType.values()[input.readInt()]
 
         readPacket(input)
     }
@@ -22,10 +19,7 @@ abstract class Packet(
     abstract fun readPacket(input: ByteBuf)
 
     fun write(output: ByteBuf) {
-        output.writeInt(this.packetId().ordinal)
-
-        writeLongs(responseUUID.mostSignificantBits, output)
-        writeLongs(responseUUID.leastSignificantBits, output)
+        writeString(output, responseUUID.toString())
         output.writeInt(packetType.ordinal)
 
         writePacket(output)

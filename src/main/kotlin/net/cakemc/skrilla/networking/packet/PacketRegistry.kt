@@ -48,8 +48,9 @@ class PacketRegistry {
     }
 
     fun createPacketOutOfId(id: Int): Packet? {
-        val identity = PacketIdentity.entries.toTypedArray()[id]
-        if (packetMap.containsKey(identity))
+        val identity = PacketIdentity.values()[id]
+
+        if (!packetMap.containsKey(identity))
             return null
 
         return packetMap.get(identity)!!.getConstructor().newInstance()

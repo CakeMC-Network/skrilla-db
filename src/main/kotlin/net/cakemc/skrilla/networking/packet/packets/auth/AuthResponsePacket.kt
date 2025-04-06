@@ -14,7 +14,7 @@ class AuthResponsePacket(
     constructor(): this(AuthStatus.FAILED)
 
     override fun readPacket(input: ByteBuf) {
-        authStatus = AuthStatus.entries.toTypedArray()[input.readInt()]
+        authStatus = AuthStatus.values()[input.readInt()]
     }
 
     override fun writePacket(output: ByteBuf) {
