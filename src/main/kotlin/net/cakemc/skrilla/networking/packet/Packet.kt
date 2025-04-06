@@ -1,6 +1,7 @@
 package net.cakemc.skrilla.networking.packet
 
 import io.netty.buffer.ByteBuf
+import java.nio.charset.Charset
 import java.util.*
 
 abstract class Packet(
@@ -34,7 +35,19 @@ abstract class Packet(
 
     abstract fun packetId(): PacketIdentity
 
-    private fun writeLongs(value: Long, byteBuf: ByteBuf): ByteBuf {
+    fun readString(input: ByteBuf): String {
+        val length = input.readInt()
+        val bytes = ByteArray(length)
+        input.readBytes(bytes)
+        return String(bytes)
+    }
+
+    fun writeString(output: ByteBuf, text: String) {
+        output.writeInt(text.length)
+        output.writeBytes(text.toByteArray(Charset.defaultCharset()))
+    }
+
+    protected fun writeLongs(value: Long, byteBuf: ByteBuf): ByteBuf {
         var value = value
         do {
             var temp = (value and 127L).toByte()
@@ -47,7 +60,7 @@ abstract class Packet(
         return byteBuf
     }
 
-    private fun readLong(byteBuf: ByteBuf): Long {
+    protected fun readLong(byteBuf: ByteBuf): Long {
         var numRead = 0
         var result: Long = 0
         var read: Byte
