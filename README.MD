@@ -9,5 +9,5 @@ Feature-list:
 - MemoryTable Flushing Gate 
 - Compressed Chunk Collection writer
 - Supported Compressions: Zlib, Zstd, Gzip
-- Native File- Read/Writeing (C-Interop)
+- Native File- Read/Writing (C-Interop)
 - Native Indexing algorithms (C-Interop)
