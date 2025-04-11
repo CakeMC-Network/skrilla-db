@@ -31,52 +31,95 @@ class SerializationSystem {
         SerializerRegistry.registerSerializer(AtomicBoolean::class, AtomicBooleanSerializer())
     }
 
+    companion object {
+        fun <T: Enum<T>> registerEnumType(clazz: Class<T>) {
+            SerializerRegistry.registerSerializer(clazz, EnumSerializer(clazz))
+        }
+    }
+
+    // Serialize function that includes fields from the superclass
     fun serialize(obj: Any): ByteArray {
         val byteArrayOutputStream = ByteArrayOutputStream()
 
-        obj.javaClass.declaredFields.forEach { field ->
-            val serializer = SerializerRegistry.getSerializer(field.type)
-                ?: throw IllegalArgumentException("No serializer found for ${field.type}")
+        var currentClass: Class<*>? = obj.javaClass
 
-            field.isAccessible = true
-            val fieldValue = field[obj]
+        // Traverse through the entire class hierarchy
+        while (currentClass != null) {
+            // Include fields from the current class
+            currentClass.declaredFields.forEach { field ->
+                val serializer = SerializerRegistry.getSerializer(field.type)
+                    ?: throw IllegalArgumentException("No serializer found for ${field.type}")
 
-            val dataSerialized = serializer.serializeAny(fieldValue)
+                field.isAccessible = true
+                val fieldValue = field[obj]
 
-            byteArrayOutputStream.write(field.name.length)
-            byteArrayOutputStream.write(field.name.toByteArray())
+                val dataSerialized = serializer.serializeAny(fieldValue)
 
-            byteArrayOutputStream.write(dataSerialized.size)
-            byteArrayOutputStream.write(dataSerialized)
+                // Write field name length, name, and data size
+                byteArrayOutputStream.write(field.name.length)
+                byteArrayOutputStream.write(field.name.toByteArray())
+
+                byteArrayOutputStream.write(dataSerialized.size)
+                byteArrayOutputStream.write(dataSerialized)
+            }
+
+            // Move up to the superclass
+            currentClass = currentClass.superclass
         }
 
         return byteArrayOutputStream.toByteArray()
     }
 
-    fun <T: Any> deserialize(bytes: ByteArray, clazz: Class<T>): T? {
+    // Deserialize function that includes fields from the superclass
+    fun <T : Any> deserialize(bytes: ByteArray, clazz: Class<T>): T? {
         val byteArrayInputStream = ByteArrayInputStream(bytes)
         val nullObject = zeroInstanceJava(clazz)
 
-        while (byteArrayInputStream.available() > 0) {
-            val fieldNameLength = byteArrayInputStream.read()
-            val fieldNameData = ByteArray(fieldNameLength)
-            byteArrayInputStream.read(fieldNameData)
-            val fieldName = String(fieldNameData)
+        var currentClass: Class<*>? = clazz
 
-            val fieldValueLength = byteArrayInputStream.read()
-            val fieldValueData = ByteArray(fieldValueLength)
-            byteArrayInputStream.read(fieldValueData)
+        // Traverse through the entire class hierarchy
+        while (currentClass != null) {
+            while (byteArrayInputStream.available() > 0) {
+                val fieldNameLength = byteArrayInputStream.read()
+                val fieldNameData = ByteArray(fieldNameLength)
+                byteArrayInputStream.read(fieldNameData)
+                val fieldName = String(fieldNameData)
 
-            val field = clazz.getDeclaredField(fieldName)
-            field.isAccessible = true
+                val fieldValueLength = byteArrayInputStream.read()
+                val fieldValueData = ByteArray(fieldValueLength)
+                byteArrayInputStream.read(fieldValueData)
 
-            val serializer = SerializerRegistry.getSerializer(field.type)
-                ?: throw IllegalArgumentException("No serializer found for ${field.type}")
+                if (currentClass.declaredFields.any { it.name.equals(fieldName) }) {
+                    val field = currentClass.getDeclaredField(fieldName)
+                    field.isAccessible = true
 
-            val fieldValue = serializer.deserialize(fieldValueData)
+                    val serializer = SerializerRegistry.getSerializer(field.type)
+                        ?: throw IllegalArgumentException("No serializer found for ${field.type}")
 
-            field.set(nullObject, fieldValue)
+                    val fieldValue = serializer.deserialize(fieldValueData)
+
+                    // Set the field in the object (even if it's in a superclass)
+                    field.set(nullObject, fieldValue)
+                } else {
+                    val superClazz = currentClass.superclass
+                    val field = superClazz.getDeclaredField(fieldName)
+                    field.isAccessible = true
+
+                    val serializer = SerializerRegistry.getSerializer(field.type)
+                        ?: throw IllegalArgumentException("No serializer found for ${field.type}")
+
+                    val fieldValue = serializer.deserialize(fieldValueData)
+
+                    // Set the field in the object (even if it's in a superclass)
+                    field.set(nullObject, fieldValue)
+                }
+
+            }
+
+            // Move up to the superclass
+            currentClass = currentClass.superclass
         }
+
         return nullObject
     }
 

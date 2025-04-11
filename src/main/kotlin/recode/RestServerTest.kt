@@ -7,9 +7,12 @@ import net.cakemc.skrilla.networking.handler.ClientHandler
 import net.cakemc.skrilla.networking.handler.PacketHandler
 import net.cakemc.skrilla.networking.packet.Packet
 import net.cakemc.skrilla.networking.packet.PacketIdentity
+import net.cakemc.skrilla.networking.packet.PacketRegistry
+import net.cakemc.skrilla.networking.packet.PacketType
 import net.cakemc.skrilla.networking.packet.packets.auth.AuthRequestPacket
 import net.cakemc.skrilla.networking.packet.packets.auth.AuthResponsePacket
 import net.cakemc.skrilla.networking.packet.packets.auth.AuthStatus
+import net.cakemc.skrilla.serial.SerializationSystem
 import java.util.concurrent.TimeUnit
 import javax.crypto.SecretKey
 import javax.crypto.spec.SecretKeySpec
@@ -22,12 +25,15 @@ const val ALGORITHM = "AES"
 val SECRET_KEY: SecretKey = SecretKeySpec(ENCODED, ALGORITHM)
 
 fun main() {
-    println(String(ENCODED))
+    SerializationSystem.registerEnumType(AuthStatus::class.java)
+    SerializationSystem.registerEnumType(PacketIdentity::class.java)
+    SerializationSystem.registerEnumType(PacketType::class.java)
 
-    val serverClientHandler = ClientHandler()
+    val registry = PacketRegistry()
+    val serverClientHandler = ClientHandler(registry)
     serverClientHandler.registerPacketHandler(PacketIdentity.AUTH_REQUEST, object : PacketHandler {
         override fun packetReceived(handler: ClientHandler, channel: Channel, packet: Packet) {
-            handler.replyToPacketSync(channel, packet, AuthResponsePacket(AuthStatus.SUCCESS))
+            handler.replyToPacketSync(channel, packet, AuthResponsePacket(AuthStatus.SUCCESS.ordinal))
         }
     })
 
@@ -38,7 +44,13 @@ fun main() {
         server.start("0.0.0.0", 2233)
     })
 
-    val clientHandler = ClientHandler()
+    val clientHandler = ClientHandler(registry)
+
+    clientHandler.registerPacketHandler(PacketIdentity.AUTH_RESPONSE, object : PacketHandler {
+        override fun packetReceived(handler: ClientHandler, channel: Channel, packet: Packet) {
+            // handle response
+        }
+    })
 
     val client = NetworkingClient(SECRET_KEY, clientHandler)
 
@@ -53,6 +65,6 @@ fun main() {
     val future = clientHandler.sendPacketWithFuture("main", AuthRequestPacket("test", "test"))
     val value = future.syncUninterruptedly(2000, TimeUnit.MILLISECONDS)
     if (value is AuthResponsePacket) {
-        println(value.authStatus.name)
+        println(AuthStatus.values()[value.authStatus])
     }
 }

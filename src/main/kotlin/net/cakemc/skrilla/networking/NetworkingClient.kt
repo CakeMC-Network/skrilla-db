@@ -81,7 +81,7 @@ class NetworkingClient(
                             CompressionEncoder(),
 
                             PacketDecoder(packetRegistry),
-                            PacketEncoder(),
+                            PacketEncoder(packetRegistry),
 
                             BossHandler(clientHandler)
                         )

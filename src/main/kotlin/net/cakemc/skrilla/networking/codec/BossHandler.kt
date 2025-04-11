@@ -13,7 +13,8 @@ class BossHandler(
     override fun channelRead0(ctx: ChannelHandlerContext, packet: Packet) {
         val responseId = packet.responseUUID
 
-        if (packet.packetType.equals(PacketType.RESPONSE)) {
+        if (packet.packetType.equals(PacketType.RESPONSE.ordinal)) {
+
             val pending = clientHandler.pendingPackets.get(responseId)
             if (pending != null)
                 pending.set(packet)

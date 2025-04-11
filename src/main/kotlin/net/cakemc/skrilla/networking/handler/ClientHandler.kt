@@ -1,33 +1,32 @@
 package net.cakemc.skrilla.networking.handler
 
 import io.netty.channel.Channel
-import net.cakemc.skrilla.networking.packet.Packet
-import net.cakemc.skrilla.networking.packet.PacketFuture
-import net.cakemc.skrilla.networking.packet.PacketIdentity
-import net.cakemc.skrilla.networking.packet.PacketType
+import net.cakemc.skrilla.networking.packet.*
 import java.util.LinkedList
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
-class ClientHandler {
+class ClientHandler(
+    val registry: PacketRegistry
+) {
 
     val contextMap: MutableMap<String, Channel> = ConcurrentHashMap()
     val pendingPackets: MutableMap<UUID, PacketFuture> = ConcurrentHashMap()
 
-    val handlerMap: MutableMap<PacketIdentity, MutableList<PacketHandler>> = ConcurrentHashMap()
+    val handlerMap: MutableMap<Int, MutableList<PacketHandler>> = ConcurrentHashMap()
 
     fun registerPacketHandler(identity: PacketIdentity, handler: PacketHandler) {
-        if (handlerMap.containsKey(identity)) {
-            handlerMap.get(identity)!!.add(handler)
+        if (handlerMap.containsKey(identity.ordinal)) {
+            handlerMap.get(identity.ordinal)!!.add(handler)
             return
         }
         val list: MutableList<PacketHandler> = LinkedList()
         list.add(handler)
-        handlerMap.put(identity, list)
+        handlerMap.put(identity.ordinal, list)
     }
 
     fun packetReceived(channel: Channel, packet: Packet) {
-        val handlerList = this.handlerMap.get(packet.packetId())
+        val handlerList = this.handlerMap.get(registry.packetIdByClass(packet.javaClass))
         if (handlerList != null) {
 
             handlerList.forEach { it.packetReceived(this, channel, packet) }
@@ -90,12 +89,14 @@ class ClientHandler {
 
         val future = PacketFuture()
         this.pendingPackets.put(packet.responseUUID, future)
+
         return future
     }
 
     fun replyToPacketSync(channel: Channel, received: Packet, reply: Packet) {
         val replyId = received.responseUUID
-        reply.packetType = PacketType.RESPONSE
+
+        reply.packetType = PacketType.RESPONSE.ordinal
         reply.responseUUID = replyId
 
         channel.writeAndFlush(reply)
@@ -143,7 +144,7 @@ class ClientHandler {
 
     fun replyToPacketAsync(channel: Channel, received: Packet, reply: Packet) {
         val replyId = received.responseUUID
-        reply.packetType = PacketType.RESPONSE
+        reply.packetType = PacketType.RESPONSE.ordinal
         reply.responseUUID = replyId
 
         Thread.ofVirtual().start {

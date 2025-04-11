@@ -4,56 +4,59 @@ import net.cakemc.skrilla.networking.packet.packets.auth.AuthRequestPacket
 import net.cakemc.skrilla.networking.packet.packets.auth.AuthResponsePacket
 import net.cakemc.skrilla.networking.packet.packets.system.request.*
 import net.cakemc.skrilla.networking.packet.packets.system.response.*
+import net.cakemc.skrilla.serial.SerializationSystem
 import java.util.concurrent.ConcurrentHashMap
 
 class PacketRegistry {
 
-    val packetMap: MutableMap<PacketIdentity, Class<out Packet>> = ConcurrentHashMap()
+    val serializer = SerializationSystem()
+    val packetMap: MutableMap<Int, Class<out Packet>> = ConcurrentHashMap()
 
     init {
-
         // AUTH
         // request
-        registerPacket(AuthRequestPacket())
+        registerPacketById(PacketIdentity.AUTH_REQUEST, AuthRequestPacket::class.java)
         // response
-        registerPacket(AuthResponsePacket())
+        registerPacketById(PacketIdentity.AUTH_RESPONSE, AuthResponsePacket::class.java)
 
         // DATABASE
         // request
-        registerPacket(CreateCollectionPacket())
-        registerPacket(DeleteDocumentPacket())
-        registerPacket(FindDocumentPacket())
-        registerPacket(GetCollectionsPacket())
-        registerPacket(GetDocumentSizePacket())
-        registerPacket(InsertDocumentPacket())
-        registerPacket(ReplaceDocumentPacket())
-        registerPacket(UpdateDocumentPacket())
+        registerPacketById(PacketIdentity.CREATE_COLLECTION, CreateCollectionPacket::class.java)
+        registerPacketById(PacketIdentity.DELETE_DOCUMENT, DeleteDocumentPacket::class.java)
+        registerPacketById(PacketIdentity.FIND_DOCUMENT, FindDocumentPacket::class.java)
+        registerPacketById(PacketIdentity.GET_COLLECTIONS, GetCollectionsPacket::class.java)
+        registerPacketById(PacketIdentity.GET_DOCUMENT_SIZE, GetDocumentSizePacket::class.java)
+        registerPacketById(PacketIdentity.INSERT_DOCUMENT, InsertDocumentPacket::class.java)
+        registerPacketById(PacketIdentity.REPLACE_DOCUMENT, ReplaceDocumentPacket::class.java)
+        registerPacketById(PacketIdentity.UPDATE_DOCUMENT, UpdateDocumentPacket::class.java)
         // response
-        registerPacket(CollectionsReplyPacket())
-        registerPacket(CreateCollectionPacket())
-        registerPacket(DeleteDocumentStatusPacket())
-        registerPacket(DocumentReplyPacket())
-        registerPacket(DocumentSizeReplyPacket())
-        registerPacket(InsertDocumentStatusPacket())
-        registerPacket(ReplaceDocumentStatusPacket())
-        registerPacket(UpdateDocumentStatusPacket())
-    }
-
-    fun registerPacket(packet: Packet) {
-        this.registerPacketById(packet.packetId(), packet.javaClass)
+        registerPacketById(PacketIdentity.COLLECTIONS_REPL, CollectionsReplyPacket::class.java)
+        registerPacketById(PacketIdentity.CREATE_COLLECTION_STATUS, CreateCollectionStatusPacket::class.java)
+        registerPacketById(PacketIdentity.DELETE_DOCUMENT_STATUS, DeleteDocumentStatusPacket::class.java)
+        registerPacketById(PacketIdentity.DOCUMENT_REPLY, DocumentReplyPacket::class.java)
+        registerPacketById(PacketIdentity.DOCUMENT_SIZE_REPL, DocumentSizeReplyPacket::class.java)
+        registerPacketById(PacketIdentity.INSERT_DOCUMENT_STATUS, InsertDocumentStatusPacket::class.java)
+        registerPacketById(PacketIdentity.REPLACE_DOCUMENT_STATUS, ReplaceDocumentStatusPacket::class.java)
+        registerPacketById(PacketIdentity.UPDATE_DOCUMENT_STATUS, UpdateDocumentStatusPacket::class.java)
     }
 
     fun registerPacketById(identity: PacketIdentity, packetClass: Class<out Packet>) {
-        packetMap.put(identity, packetClass)
+        packetMap.put(identity.ordinal, packetClass)
     }
 
-    fun createPacketOutOfId(id: Int): Packet? {
-        val identity = PacketIdentity.values()[id]
+    fun packetIdByClass(clazz: Class<out Packet>): Int {
+        var foundPacketId = 0
+        packetMap.forEach { packetId, packetClazz ->
+            if (packetClazz.name.equals(clazz.name)) {
+                foundPacketId = packetId
+                return@forEach
+            }
+        }
+        return foundPacketId
+    }
 
-        if (!packetMap.containsKey(identity))
-            return null
-
-        return packetMap.get(identity)!!.getConstructor().newInstance()
+    fun createPacketOutOfId(id: Int): Class<out Packet>? {
+        return packetMap.getOrDefault(id, null)
     }
 
 }

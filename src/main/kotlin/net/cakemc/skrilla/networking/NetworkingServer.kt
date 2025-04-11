@@ -115,7 +115,7 @@ class NetworkingServer(
                             CompressionEncoder(),
 
                             PacketDecoder(packetRegistry),
-                            PacketEncoder(),
+                            PacketEncoder(packetRegistry),
 
                             BossHandler(clientHandler)
                         )

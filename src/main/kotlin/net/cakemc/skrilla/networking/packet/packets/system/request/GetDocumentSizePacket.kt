@@ -8,20 +8,5 @@ import net.cakemc.skrilla.networking.packet.PacketType
 class GetDocumentSizePacket(
     var collection: String
 ): Packet(
-    packetType = PacketType.REQUEST
-) {
-
-    constructor() : this("")
-
-    override fun readPacket(input: ByteBuf) {
-        collection = readString(input)
-    }
-
-    override fun writePacket(output: ByteBuf) {
-        writeString(output, collection)
-    }
-
-    override fun packetId(): PacketIdentity {
-        return PacketIdentity.GET_DOCUMENT_SIZE
-    }
-}
+    packetType = PacketType.REQUEST.ordinal
+)
