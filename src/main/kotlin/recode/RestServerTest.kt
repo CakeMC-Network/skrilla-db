@@ -22,6 +22,8 @@ const val ALGORITHM = "AES"
 val SECRET_KEY: SecretKey = SecretKeySpec(ENCODED, ALGORITHM)
 
 fun main() {
+    println(String(ENCODED))
+
     val serverClientHandler = ClientHandler()
     serverClientHandler.registerPacketHandler(PacketIdentity.AUTH_REQUEST, object : PacketHandler {
         override fun packetReceived(handler: ClientHandler, channel: Channel, packet: Packet) {
