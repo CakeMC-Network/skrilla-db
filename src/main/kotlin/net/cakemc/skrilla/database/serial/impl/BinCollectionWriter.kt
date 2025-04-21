@@ -13,6 +13,25 @@ import java.util.function.Consumer
  */
 class BinCollectionWriter : AbstractWrite() {
 
+    /**
+     * Serializes a `Collection<DatabaseRecord>` into a binary format.
+     *
+     * The serialized output contains metadata (collection ID, name, number of documents)
+     * followed by each document’s size and serialized content. A `Consumer` is used to
+     * optionally apply an operation to each document before serialization.
+     *
+     * The resulting format is:
+     * - Long (8 bytes): Collection ID
+     * - UTF String: Collection name
+     * - Int (4 bytes): Number of documents
+     * - Repeated per document:
+     *   - Int (4 bytes): Size of serialized document
+     *   - ByteArray: Serialized document bytes of the given size
+     *
+     * @param collection The collection to serialize.
+     * @param consumer A `Consumer<Document>` that processes each document before serialization (e.g., for modification, transformation, logging).
+     * @return A `ByteArray` containing the full serialized representation of the collection.
+     */
     override fun writeCollection(collection: Collection<DatabaseRecord>, consumer: Consumer<Document>): ByteArray {
         val byteStream = ByteArrayOutputStream()
         val dataStream = DataOutputStream(byteStream)

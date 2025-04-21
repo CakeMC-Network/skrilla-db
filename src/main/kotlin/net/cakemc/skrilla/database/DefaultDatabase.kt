@@ -9,11 +9,11 @@ import net.cakemc.database.serial.AbstractRead
 import net.cakemc.database.serial.AbstractWrite
 import net.cakemc.database.serial.impl.BinCollectionReader
 import net.cakemc.database.serial.impl.BinCollectionWriter
-import net.cakemc.skrilla.database.CollectionInfo
-import net.cakemc.skrilla.database.Index
-import net.cakemc.skrilla.database.IndexEntry
-import net.cakemc.skrilla.natives.file.FileUtility
-import net.cakemc.skrilla.natives.file.FileUtilityFactory
+import net.cakemc.skrilla.database.api.CollectionInfo
+import net.cakemc.skrilla.database.index.Index
+import net.cakemc.skrilla.database.index.IndexEntry
+import net.cakemc.skrilla.database.natives.file.FileUtility
+import net.cakemc.skrilla.database.natives.file.FileUtilityFactory
 import java.io.ByteArrayInputStream
 import java.io.DataInputStream
 import java.nio.charset.Charset
@@ -26,50 +26,59 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ThreadLocalRandom
 
 /**
- * The type Default database.
+ * A default file-based implementation of the [AbstractDatabase].
+ *
+ * This database stores documents in binary format, supports write-ahead logging (WAL),
+ * maintains index files, and uses simple compression for storage optimization.
+ *
+ * @property folder The root path where collections and metadata are stored.
  */
 open class DefaultDatabase(val folder: Path) : AbstractDatabase() {
-    private val collectionMap: MutableMap<String, Collection<DatabaseRecord>> =
-        ConcurrentHashMap()
 
+    private val collectionMap: MutableMap<String, Collection<DatabaseRecord>> = ConcurrentHashMap()
     private val databaseFolder = folder.apply { Files.createDirectories(folder) }
 
     private val collectionWriter: AbstractWrite = BinCollectionWriter()
     private val collectionReader: AbstractRead = BinCollectionReader()
-
     private val fileUtility: FileUtility = FileUtilityFactory.create()
 
     private val indexFile = Path.of("index.idx")
     private val walFile = Path.of("wal.txt")
 
-    // Index map: document ID -> (file name, offset in the file)
     private val indexes: MutableMap<String, Index> = ConcurrentHashMap()
 
     private val MAX_DOCUMENTS_PER_FILE = 10000
 
+    /**
+     * Retrieves or lazily creates a collection with the given name.
+     */
     override fun getCollection(name: String): Collection<DatabaseRecord> {
-        if (collectionMap.containsKey(name)) {
-            return collectionMap[name]!!
-        }
+        if (collectionMap.containsKey(name)) return collectionMap[name]!!
         val collection = DocumentCollection(ArrayList(), nextFreeId(), name)
         collectionMap[collection.name] = collection
         return collection
     }
 
+    /**
+     * Returns a list of all loaded collections.
+     */
     override fun getCollections(): List<Collection<DatabaseRecord>> {
         return collectionMap.values.toList()
     }
 
+    /**
+     * Generates a new collection ID that is not already used.
+     */
     private fun nextFreeId(): Long {
         val current = ThreadLocalRandom.current().nextLong()
-
-        if (collectionMap.entries.stream()
-                .anyMatch { entry: Map.Entry<String, Collection<DatabaseRecord>> -> entry.value.id == current }
-        ) return nextFreeId()
-
+        if (collectionMap.values.any { it.id == current }) return nextFreeId()
         return current
     }
 
+    /**
+     * Saves all collections to disk. Performs compression, creates index files,
+     * writes metadata and clears the write-ahead log.
+     */
     override fun save() {
         for ((key, value) in collectionMap) {
             val collectionFolder = Paths.get(folder.toString(), "/$key/")
@@ -89,7 +98,6 @@ open class DefaultDatabase(val folder: Path) : AbstractDatabase() {
                 val data = collectionWriter.serializeDocument(document)
                 val compressedData = DEFAULT_COMPRESSION.compress(data)
                 dataBuilder.add(compressedData)
-
                 documentCount++
 
                 if (documentCount >= MAX_DOCUMENTS_PER_FILE) {
@@ -102,7 +110,6 @@ open class DefaultDatabase(val folder: Path) : AbstractDatabase() {
                 }
             }
 
-            // Save any remaining documents
             if (dataBuilder.isNotEmpty()) {
                 collectionFiles.add(currentDataFilePath)
                 saveToFile(currentDataFilePath, dataBuilder)
@@ -110,16 +117,9 @@ open class DefaultDatabase(val folder: Path) : AbstractDatabase() {
 
             updateIndexFile(collectionFolder, value, collectionFiles.map { it.fileName })
 
-            // Save info file
             val infoFile = collectionFolder.resolve("info.meta")
             val now = System.currentTimeMillis()
-            val collectionInfo = CollectionInfo(
-                createTime = now,
-                lastWriteTime = now,
-                lastReadTime = 0L,
-                collectionId = value.id
-            )
-
+            val collectionInfo = CollectionInfo(now, now, 0L, value.id)
             val infoBytes = serializeInfo(collectionInfo)
             fileUtility.saveFile(infoFile.toString(), infoBytes)
 
@@ -127,6 +127,9 @@ open class DefaultDatabase(val folder: Path) : AbstractDatabase() {
         }
     }
 
+    /**
+     * Saves a single document to its corresponding collection, maintaining the index file and metadata.
+     */
     fun saveSingleDocument(document: Document, collectionName: String) {
         val collection = getCollection(collectionName)
         val collectionFolder = folder.resolve(collectionName)
@@ -135,29 +138,21 @@ open class DefaultDatabase(val folder: Path) : AbstractDatabase() {
         val documentId = document.id
         val index = indexes.getOrPut(collectionName) { Index(LinkedList()) }
 
-        // Serialize and compress the document
         val serialized = collectionWriter.serializeDocument(document)
         val compressed = DEFAULT_COMPRESSION.compress(serialized)
 
-        // Determine the file and offset
         var indexEntry = index.entries.find { it.documentId == documentId }
 
-        // If document is new or index entry is missing, append to last file
         if (indexEntry == null) {
-            // Determine the next file to append
             val lastFileIndex = index.entries.maxOfOrNull { it.offset / MAX_DOCUMENTS_PER_FILE } ?: 0
             val nextOffset = index.entries.count { it.fileName == "data-${lastFileIndex + 1}.db_bin" }
-
             val fileName = "data-${lastFileIndex + 1}.db_bin"
             val dataFilePath = collectionFolder.resolve(fileName)
 
-            // Append the document to the file
             Files.write(dataFilePath, compressed, StandardOpenOption.CREATE, StandardOpenOption.APPEND)
-
             indexEntry = IndexEntry(documentId, fileName, nextOffset.toLong())
             index.entries.add(indexEntry)
         } else {
-            // Overwrite by rewriting whole file (simplified, consider improving this)
             val dataFilePath = collectionFolder.resolve(indexEntry.fileName)
             val existingRaw = fileUtility.readFile(dataFilePath.toString())
             val decompressed = DEFAULT_COMPRESSION.decompress(existingRaw)
@@ -179,27 +174,30 @@ open class DefaultDatabase(val folder: Path) : AbstractDatabase() {
 
         updateIndexFile(collectionFolder, collection, index.entries.map { Path.of(it.fileName) })
 
-        // Update metadata
         val infoFile = collectionFolder.resolve("info.meta")
         val now = System.currentTimeMillis()
         val info = if (Files.exists(infoFile)) {
             deserializeInfo(fileUtility.readFile(infoFile.toString()))
         } else {
-            CollectionInfo(createTime = now, lastWriteTime = now, lastReadTime = 0, collectionId = collection.id)
+            CollectionInfo(now, now, 0, collection.id)
         }
         val updatedInfo = info.copy(lastWriteTime = now)
         fileUtility.saveFile(infoFile.toString(), serializeInfo(updatedInfo))
     }
 
-
+    /**
+     * Writes the compressed list of documents to the file.
+     */
     private fun saveToFile(filePath: Path, data: List<ByteArray>) {
         val compressed = data.reduce { acc, byteArray -> acc + byteArray }
         fileUtility.saveFile(filePath.toString(), compressed)
     }
 
+    /**
+     * Creates or updates the index file that maps document IDs to their file and offset.
+     */
     private fun updateIndexFile(collectionFolder: Path, collection: Collection<DatabaseRecord>, collectionFiles: List<Path>) {
         val collectionIndex = collectionFolder.resolve(indexFile)
-
         val indexData = mutableListOf<String>()
 
         for (file in collectionFiles) {
@@ -216,44 +214,46 @@ open class DefaultDatabase(val folder: Path) : AbstractDatabase() {
         fileUtility.saveFile(collectionIndex.toString(), compressed)
     }
 
+    /**
+     * Loads all collections from disk, recovering from WAL and reading data/index files.
+     */
     override fun load() {
         Files.list(folder).forEach { collectionFolder ->
-
             recoverFromWAL(collectionFolder)
-
             val collectionName = collectionFolder.getName(2).toString()
-            val index = loadIndex(collectionFolder, collectionName) // todo maybe use for fast read
+            val index = loadIndex(collectionFolder, collectionName)
 
-            Files.list(collectionFolder).filter {it.fileName.toString().contains("data")}.forEach {
+            Files.list(collectionFolder)
+                .filter { it.fileName.toString().contains("data") }
+                .forEach {
+                    val rawBytes = fileUtility.readFile(it.toString())
+                    val decompressed = DEFAULT_COMPRESSION.decompress(rawBytes)
+                    val list = ArrayList<DatabaseRecord>()
+                    val buffer = DataInputStream(ByteArrayInputStream(decompressed))
 
-                val rawBytes = fileUtility.readFile(it.toString())
-                val decompressed = DEFAULT_COMPRESSION.decompress(rawBytes)
+                    while (buffer.available() != 0) {
+                        val document = collectionReader.readElement(buffer)
+                        list.add(document)
+                    }
 
-                val list = ArrayList<DatabaseRecord>()
+                    val infoFile = collectionFolder.resolve("info.meta")
+                    val info = if (Files.exists(infoFile)) {
+                        deserializeInfo(fileUtility.readFile(infoFile.toString()))
+                    } else {
+                        CollectionInfo(System.currentTimeMillis(), 0, 0, nextFreeId())
+                    }
 
-                val buffer = DataInputStream(ByteArrayInputStream(decompressed))
-                while (buffer.available() != 0) {
-                    val document = collectionReader.readElement(buffer)
-                    list.add(document)
+                    val updatedInfo = info.copy(lastReadTime = System.currentTimeMillis())
+                    fileUtility.saveFile(infoFile.toString(), serializeInfo(updatedInfo))
+
+                    collectionMap[collectionName] = DocumentCollection(list, updatedInfo.collectionId, collectionName)
                 }
-
-                val infoFile = collectionFolder.resolve("info.meta")
-                val info = if (Files.exists(infoFile)) {
-                    deserializeInfo(fileUtility.readFile(infoFile.toString()))
-                } else {
-                    CollectionInfo(System.currentTimeMillis(), 0, 0, nextFreeId())
-                }
-
-                // Update lastReadTime
-                val updatedInfo = info.copy(lastReadTime = System.currentTimeMillis())
-                fileUtility.saveFile(infoFile.toString(), serializeInfo(updatedInfo))
-
-                collectionMap[collectionName] = DocumentCollection(list, updatedInfo.collectionId, collectionName)
-
-            }
         }
     }
 
+    /**
+     * Loads the index file from disk for the specified collection.
+     */
     private fun loadIndex(collectionPath: Path, collectionName: String): Index {
         val indexPath = collectionPath.resolve(indexFile)
         val rawBytes = Files.readAllBytes(indexPath)
@@ -267,50 +267,48 @@ open class DefaultDatabase(val folder: Path) : AbstractDatabase() {
             val fileOffset = parts[1].split(":")
             val fileName = fileOffset[0]
             val offset = fileOffset[1].toLong()
-
-            val indexEntry = IndexEntry(id, fileName, offset)
-            index.entries.add(indexEntry)
+            index.entries.add(IndexEntry(id, fileName, offset))
         }
 
-        indexes.put(collectionName, index)
+        indexes[collectionName] = index
         return index
     }
 
+    /**
+     * Deserialize collection info metadata.
+     */
     private fun deserializeInfo(bytes: ByteArray): CollectionInfo {
         val split = String(bytes, Charsets.UTF_8).split(",")
-        return CollectionInfo(
-            createTime = split[0].toLong(),
-            lastWriteTime = split[1].toLong(),
-            lastReadTime = split[2].toLong(),
-            collectionId = split[3].toLong()
-        )
+        return CollectionInfo(split[0].toLong(), split[1].toLong(), split[2].toLong(), split[3].toLong())
     }
 
+    /**
+     * Serialize collection info to a byte array.
+     */
     private fun serializeInfo(info: CollectionInfo): ByteArray {
-        val joined = listOf(
-            info.createTime,
-            info.lastWriteTime,
-            info.lastReadTime,
-            info.collectionId
-        ).joinToString(separator = ",")
+        val joined = listOf(info.createTime, info.lastWriteTime, info.lastReadTime, info.collectionId).joinToString(",")
         return joined.toByteArray(Charsets.UTF_8)
     }
 
+    /**
+     * Appends a document operation to the Write-Ahead Log (WAL).
+     */
     private fun appendToWAL(collectionPath: Path, collectionName: String, document: Document) {
         val walFile = collectionPath.resolve(walFile)
-
         val serialized = collectionWriter.serializeDocument(document)
         val base64Data = Base64.getEncoder().encodeToString(serialized)
         val line = "$collectionName;${document.id};$base64Data\n"
-
         Files.writeString(walFile, line, StandardOpenOption.CREATE, StandardOpenOption.APPEND)
     }
 
+    /**
+     * Applies uncommitted changes from WAL during database startup.
+     */
     private fun recoverFromWAL(collectionPath: Path) {
         val walFile = collectionPath.resolve(walFile)
-
-        if (!Files.exists(walFile))
+        if (!Files.exists(walFile)) {
             fileUtility.saveFile(walFile.toString(), "".toByteArray(Charset.defaultCharset()))
+        }
 
         Files.readAllLines(walFile).forEach { line ->
             val parts = line.split(";")
@@ -327,9 +325,11 @@ open class DefaultDatabase(val folder: Path) : AbstractDatabase() {
         }
     }
 
+    /**
+     * Clears the write-ahead log after successful persistence.
+     */
     private fun clearWAL(collectionPath: Path) {
         val walFile = collectionPath.resolve(walFile)
         fileUtility.saveFile(walFile.toString(), "".toByteArray(Charset.defaultCharset()))
     }
-
 }

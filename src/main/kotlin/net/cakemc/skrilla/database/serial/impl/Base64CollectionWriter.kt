@@ -26,8 +26,6 @@ class Base64CollectionWriter {
         dataStream.writeInt(document.size())
 
         for ((key, value) in document.elements) {
-            if (value == null) continue
-
             dataStream.writeUTF(key)
 
             when (value) {

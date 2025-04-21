@@ -13,6 +13,23 @@ import java.util.*
  */
 class BinCollectionReader : AbstractRead() {
 
+    /**
+     * Deserializes a binary-encoded collection from a byte array.
+     *
+     * This method reconstructs a `DocumentCollection` by reading its metadata (ID, name, document count),
+     * followed by deserializing each individual document contained in the byte array.
+     *
+     * The expected binary format is:
+     * - Long (8 bytes): Collection ID
+     * - UTF String: Collection name
+     * - Int (4 bytes): Number of documents
+     * - Repeated per document:
+     *   - Int (4 bytes): Size of the serialized document
+     *   - ByteArray: Serialized document bytes of the given size
+     *
+     * @param data The byte array representing the serialized collection. Can be `null` but not recommended.
+     * @return A `Collection<DatabaseRecord>` representing the fully reconstructed collection with all documents.
+     */
     override fun read(data: ByteArray?): Collection<DatabaseRecord> {
         val byteStream = ByteArrayInputStream(data)
         val dataStream = DataInputStream(byteStream)

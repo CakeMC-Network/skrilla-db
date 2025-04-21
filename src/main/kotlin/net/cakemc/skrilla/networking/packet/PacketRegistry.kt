@@ -4,7 +4,7 @@ import net.cakemc.skrilla.networking.packet.packets.auth.AuthRequestPacket
 import net.cakemc.skrilla.networking.packet.packets.auth.AuthResponsePacket
 import net.cakemc.skrilla.networking.packet.packets.system.request.*
 import net.cakemc.skrilla.networking.packet.packets.system.response.*
-import net.cakemc.skrilla.serial.SerializationSystem
+import net.cakemc.skrilla.database.serial.SerializationSystem
 import java.util.concurrent.ConcurrentHashMap
 
 class PacketRegistry {

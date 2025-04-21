@@ -4,15 +4,19 @@ import net.cakemc.database.api.Document
 import net.cakemc.database.callbacks.ConditionalConsumer
 
 /**
- * The type Filters.
+ * The [Filters] object provides a collection of static utility methods to create various types of filters
+ * for filtering [Document] objects. These filters can be used to evaluate whether a document matches
+ * certain conditions, such as having a specific key-value pair, containing a key, or matching a specific id.
+ * Additionally, it provides methods for combining multiple filters with logical operations like AND and OR.
  */
 object Filters {
+
     /**
-     * Eq piece piece filter.
+     * Creates a filter that checks if the value for the given [key] in the [Document] is equal to the specified [value].
      *
-     * @param key   the key
-     * @param value the value
-     * @return the piece filter
+     * @param key the key to check in the document
+     * @param value the value to compare against
+     * @return a [DocumentFilter] that checks if the document contains the key with the specified value
      */
     @JvmStatic
     fun eq(key: String?, value: Any): DocumentFilter {
@@ -23,10 +27,10 @@ object Filters {
     }
 
     /**
-     * Contains piece filter.
+     * Creates a filter that checks if the given [Document] contains the specified [key].
      *
-     * @param key the key
-     * @return the piece filter
+     * @param key the key to check for in the document
+     * @return a [DocumentFilter] that checks if the document contains the key
      */
     @JvmStatic
     fun contains(key: String): DocumentFilter {
@@ -34,10 +38,10 @@ object Filters {
     }
 
     /**
-     * Id piece filter.
+     * Creates a filter that checks if the given [Document] has the specified [id].
      *
-     * @param id the id
-     * @return the piece filter
+     * @param id the id to match against
+     * @return a [DocumentFilter] that checks if the document's id matches the given id
      */
     @JvmStatic
     fun id(id: Long): DocumentFilter {
@@ -45,10 +49,10 @@ object Filters {
     }
 
     /**
-     * Index piece filter.
+     * Creates a filter that checks if the given [Document] has the specified [index].
      *
-     * @param index the index
-     * @return the piece filter
+     * @param index the index to match against
+     * @return a [DocumentFilter] that checks if the document's index matches the given index
      */
     @JvmStatic
     fun index(index: Int): DocumentFilter {
@@ -56,14 +60,14 @@ object Filters {
     }
 
     /**
-     * Custom piece filter.
+     * Creates a custom filter based on a key and a conditional consumer. This allows for more complex filtering conditions.
+     * The consumer will evaluate the value associated with the key in the document.
      *
-     * @param <T>      the type parameter
-     * @param key      the key
-     * @param consumer the consumer
-     * @return the piece filter
-    </T> */
-    @JvmStatic
+     * @param key the key to check in the document
+     * @param consumer the [ConditionalConsumer] that will evaluate the value
+     * @return a [DocumentFilter] that evaluates the custom condition
+     */
+    @JvmStatic @Suppress("UNCHECKED_CAST")
     fun <T> custom(key: String, consumer: ConditionalConsumer<T?>): DocumentFilter {
         return DocumentFilter { document: Document ->
             if (!document.contains(key)) return@DocumentFilter false
@@ -73,10 +77,10 @@ object Filters {
     }
 
     /**
-     * And piece filter
+     * Combines multiple filters with a logical AND operation. A document will match if it satisfies all of the provided filters.
      *
-     * @param filters the filters
-     * @return the combined piece filter
+     * @param filters the filters to combine
+     * @return a [DocumentFilter] that represents the logical AND of all filters
      */
     @JvmStatic
     fun and(vararg filters: DocumentFilter): DocumentFilter {
@@ -86,10 +90,10 @@ object Filters {
     }
 
     /**
-     * Or piece filter
+     * Combines multiple filters with a logical OR operation. A document will match if it satisfies at least one of the provided filters.
      *
-     * @param filters the filters
-     * @return the combined piece filter
+     * @param filters the filters to combine
+     * @return a [DocumentFilter] that represents the logical OR of all filters
      */
     @JvmStatic
     fun or(vararg filters: DocumentFilter): DocumentFilter {

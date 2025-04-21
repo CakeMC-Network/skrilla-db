@@ -9,277 +9,284 @@ import net.cakemc.database.filter.Filter
 import net.cakemc.database.filter.DocumentFilter
 
 /**
- * The interface Collection.
+ * The Collection interface defines methods for interacting with a collection of elements
+ * in a database-like structure. This includes operations like finding, inserting, updating,
+ * and deleting elements, as well as managing documents asynchronously and synchronously.
  *
- * @param <T> the type parameter
-</T> */
+ * @param <T> the type of the elements stored in the collection
+ */
 @Suppress("unused")
 interface Collection<T> {
+
     /**
-     * Multi Document async.
+     * Retrieves multiple documents asynchronously based on the given filter and cursor supplier.
      *
-     * @param filter         the filter
-     * @param cursorSupplier the cursor supplier
-     * @param callBack       the call back
+     * @param filter the filter that defines the conditions to match documents
+     * @param cursorSupplier the cursor supplier used to create the cursor for the found documents
+     * @param callBack the callback to handle the result or error of the operation
      */
-    // find
     fun multiDocumentAsync(filter: DocumentFilter, cursorSupplier: DocumentCursorSupplier, callBack: DocumentAsyncMultiCallBack)
 
     /**
-     * Single Document async.
+     * Retrieves a single document asynchronously based on the given filter.
      *
-     * @param supplier         the supplier
-     * @param documentCallBack the document call back
+     * @param supplier the filter supplier that defines the conditions to match a single document
+     * @param documentCallBack the callback to handle the result or error of the operation
      */
     fun singleDocumentAsync(supplier: DocumentFilter, documentCallBack: DocumentAsyncCallBack)
 
     /**
-     * Multi async.
+     * Retrieves multiple elements asynchronously based on the provided filter and cursor supplier.
      *
-     * @param filter         the filter
-     * @param cursorSupplier the cursor supplier
-     * @param callBack       the call back
+     * @param filter the filter that defines the conditions to match elements
+     * @param cursorSupplier the cursor supplier used to create the cursor for the found elements
+     * @param callBack the callback to handle the result or error of the operation
      */
     fun multiAsync(filter: Filter<T>, cursorSupplier: CursorSupplier<T, Cursor<T>>, callBack: AsyncMultiCallBack<T>)
 
     /**
-     * Single async.
+     * Retrieves a single element asynchronously based on the given filter.
      *
-     * @param supplier         the supplier
-     * @param documentCallBack the document call back
+     * @param supplier the filter supplier that defines the conditions to match a single element
+     * @param documentCallBack the callback to handle the result or error of the operation
      */
     fun singleAsync(supplier: Filter<T>, documentCallBack: AsyncCallBack<T>)
 
     /**
-     * Multi Document cursor.
+     * Retrieves multiple documents synchronously based on the provided filter and cursor supplier.
      *
-     * @param filter         the filter
-     * @param cursorSupplier the cursor supplier
-     * @return the cursor
+     * @param filter the filter that defines the conditions to match documents
+     * @param cursorSupplier the cursor supplier used to create the cursor for the found documents
+     * @return the cursor containing the matching documents
      */
     fun multiDocument(filter: DocumentFilter, cursorSupplier: DocumentCursorSupplier): Cursor<Document>
 
     /**
-     * Single Document Document.
+     * Retrieves a single document synchronously based on the provided filter.
      *
-     * @param supplier the supplier
-     * @return the Document
+     * @param supplier the filter that defines the condition to match a single document
+     * @return the matching document or null if no document is found
      */
     fun singleDocument(supplier: DocumentFilter): Document?
 
     /**
-     * Multi cursor.
+     * Finds a single document in the collection that matches the conditions specified by the provided filter.
+     * The filter defines the criteria to find the document in the collection.
+     * If multiple documents match the filter, only the first one encountered is returned.
      *
-     * @param filter         the filter
-     * @param cursorSupplier the cursor supplier
-     * @return the cursor
+     * @param supplier the filter used to define the conditions that the document must match
+     * @return the matching document, or null if no document is found that satisfies the filter
+     */
+    fun findDocument(supplier: DocumentFilter): Document?
+
+
+    /**
+     * Retrieves multiple elements synchronously based on the provided filter and cursor supplier.
+     *
+     * @param filter the filter that defines the conditions to match elements
+     * @param cursorSupplier the cursor supplier used to create the cursor for the found elements
+     * @return the cursor containing the matching elements
      */
     fun multi(filter: Filter<T>, cursorSupplier: CursorSupplier<T, Cursor<T>>): Cursor<T>
 
     /**
-     * Single t.
+     * Retrieves a single element synchronously based on the provided filter.
      *
-     * @param supplier the supplier
-     * @return the t
+     * @param supplier the filter that defines the condition to match a single element
+     * @return the matching element or null if no element is found
      */
     fun single(supplier: Filter<T>): T?
 
     /**
-     * Replace one Document.
+     * Replaces a single document based on the provided filter.
      *
-     * @param filter  the filter
-     * @param element the element
+     * @param filter the filter that defines the condition to match the document to be replaced
+     * @param element the new document that will replace the existing one
      */
-    // replace
     fun replaceOneDocument(filter: DocumentFilter, element: Document)
 
     /**
-     * Replace one Document async.
+     * Replaces a single document asynchronously based on the provided filter.
      *
-     * @param filter   the filter
-     * @param element  the element
-     * @param listener the listener
+     * @param filter the filter that defines the condition to match the document to be replaced
+     * @param element the new document that will replace the existing one
+     * @param listener the listener to handle success or failure of the operation
      */
     fun replaceOneDocumentAsync(filter: DocumentFilter, element: Document, listener: DatabaseListener)
 
     /**
-     * Replace one.
+     * Replaces a single element based on the provided filter.
      *
-     * @param filter  the filter
-     * @param element the element
+     * @param filter the filter that defines the condition to match the element to be replaced
+     * @param element the new element that will replace the existing one
      */
     fun replaceOne(filter: Filter<T>, element: T)
 
     /**
-     * Replace one async.
+     * Replaces a single element asynchronously based on the provided filter.
      *
-     * @param filter   the filter
-     * @param element  the element
-     * @param listener the listener
+     * @param filter the filter that defines the condition to match the element to be replaced
+     * @param element the new element that will replace the existing one
+     * @param listener the listener to handle success or failure of the operation
      */
     fun replaceOneAsync(filter: Filter<T>, element: T, listener: DatabaseListener)
 
     /**
-     * Update one Document.
+     * Updates a single document based on the provided filter.
      *
-     * @param filter  the filter
-     * @param element the element
+     * @param filter the filter that defines the condition to match the document to be updated
+     * @param element the document with updated data
      */
-    // update
     fun updateOneDocument(filter: DocumentFilter, element: Document)
 
     /**
-     * Update one Document async.
+     * Updates a single document asynchronously based on the provided filter.
      *
-     * @param filter   the filter
-     * @param element  the element
-     * @param listener the listener
+     * @param filter the filter that defines the condition to match the document to be updated
+     * @param element the document with updated data
+     * @param listener the listener to handle success or failure of the operation
      */
     fun updateOneDocumentAsync(filter: DocumentFilter, element: Document, listener: DatabaseListener)
 
     /**
-     * Update one.
+     * Updates a single element based on the provided filter.
      *
-     * @param filter  the filter
-     * @param element the element
+     * @param filter the filter that defines the condition to match the element to be updated
+     * @param element the element with updated data
      */
     fun updateOne(filter: Filter<T>, element: T)
 
     /**
-     * Update one async.
+     * Updates a single element asynchronously based on the provided filter.
      *
-     * @param filter   the filter
-     * @param element  the element
-     * @param listener the listener
+     * @param filter the filter that defines the condition to match the element to be updated
+     * @param element the element with updated data
+     * @param listener the listener to handle success or failure of the operation
      */
     fun updateOneAsync(filter: Filter<T>, element: T, listener: DatabaseListener)
 
     /**
-     * Delete one Document.
+     * Deletes a single document.
      *
-     * @param element the element
+     * @param element the document to be deleted
      */
-    // delete
     fun deleteOneDocument(element: Document)
 
     /**
-     * Delete many Document.
+     * Deletes multiple documents.
      *
-     * @param element the element
+     * @param element the documents to be deleted
      */
     fun deleteManyDocument(vararg element: Document)
 
     /**
-     * Delete one Document async.
+     * Deletes a single document asynchronously.
      *
-     * @param element  the element
-     * @param listener the listener
+     * @param element the document to be deleted
+     * @param listener the listener to handle success or failure of the operation
      */
     fun deleteOneDocumentAsync(element: Document, listener: DatabaseListener)
 
     /**
-     * Delete many Document async.
+     * Deletes multiple documents asynchronously.
      *
-     * @param listener the listener
-     * @param element  the element
+     * @param listener the listener to handle success or failure of the operation
+     * @param element the documents to be deleted
      */
     fun deleteManyDocumentAsync(listener: DatabaseListener, vararg element: Document)
 
     /**
-     * Delete one.
+     * Deletes a single element.
      *
-     * @param element the element
+     * @param element the element to be deleted
      */
     fun deleteOne(element: T)
 
     /**
-     * Delete many.
+     * Deletes multiple elements.
      *
-     * @param element the element
+     * @param element the elements to be deleted
      */
     fun deleteMany(element: Array<T>)
 
     /**
-     * Delete one async.
+     * Deletes a single element asynchronously.
      *
-     * @param element  the element
-     * @param listener the listener
+     * @param element the element to be deleted
+     * @param listener the listener to handle success or failure of the operation
      */
     fun deleteOneAsync(element: T, listener: DatabaseListener)
 
     /**
-     * Delete many async.
+     * Deletes multiple elements asynchronously.
      *
-     * @param element  the element
-     * @param listener the listener
+     * @param element the elements to be deleted
+     * @param listener the listener to handle success or failure of the operation
      */
     fun deleteManyAsync(element: Array<T>, listener: DatabaseListener)
 
     /**
-     * Insert one Document.
+     * Inserts a single document.
      *
-     * @param element the element
+     * @param element the document to be inserted
      */
-    // insert
     fun insertOneDocument(element: Document)
 
     /**
-     * Insert one Document async.
+     * Inserts a single document asynchronously.
      *
-     * @param element  the element
-     * @param listener the listener
+     * @param element the document to be inserted
+     * @param listener the listener to handle success or failure of the operation
      */
     fun insertOneDocumentAsync(element: Document, listener: DatabaseListener)
 
     /**
-     * Insert one.
+     * Inserts a single element.
      *
-     * @param element the element
+     * @param element the element to be inserted
      */
     fun insertOne(element: T)
 
     /**
-     * Insert one async.
+     * Inserts a single element asynchronously.
      *
-     * @param element  the element
-     * @param listener the listener
+     * @param element the element to be inserted
+     * @param listener the listener to handle success or failure of the operation
      */
     fun insertOneAsync(element: T, listener: DatabaseListener)
 
     /**
-     * Define one t.
+     * Defines a new instance of the element type.
      *
-     * @return the t
+     * @return a new instance of the element type
      */
-    // creation
     fun defineOne(): T
 
     /**
-     * Define one peace Document.
+     * Defines a new document instance.
      *
-     * @return the Document
+     * @return a new document instance
      */
     fun defineDocument(): Document
 
-
     /**
-     * Gets id.
+     * Gets the ID of the collection.
      *
-     * @return the id
+     * @return the ID of the collection
      */
     val id: Long
 
     /**
-     * Gets name.
+     * Gets the name of the collection.
      *
-     * @return the name
+     * @return the name of the collection
      */
     val name: String
 
     /**
-     * Collect list.
+     * Collects and returns all documents from the collection.
      *
-     * @return the list
+     * @return the list of all documents in the collection
      */
     fun collect(): List<Document>
 }

@@ -11,22 +11,41 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
 
 /**
- * The type Abstract collection.
+ * The `AbstractCollection` class represents an abstract implementation of a collection within the database.
+ * It allows for operations on a list of elements of type `T`, including querying, inserting, updating,
+ * replacing, and deleting elements. This class also supports both synchronous and asynchronous operations
+ * with callbacks for various database actions.
  *
- * @param <T> the type parameter
-</T> */
-abstract class AbstractCollection<T>
-/**
- * Instantiates a new Abstract collection.
- *
- * @param elements the elements
- * @param id       the id
- * @param name     the name
- */(
-    @JvmField val elements: MutableList<T>, override val id: Long,
+ * @param T The type of the elements contained in the collection.
+ * @param elements The list of elements in the collection.
+ * @param id The unique identifier for the collection.
+ * @param name The name of the collection.
+ */
+abstract class AbstractCollection<T>(
+    /**
+     * A mutable list of elements contained in the collection.
+     */
+    @JvmField val elements: MutableList<T>,
+
+    /**
+     * The unique identifier for the collection.
+     */
+    override val id: Long,
+
+    /**
+     * The name of the collection.
+     */
     override val name: String
 ) : Collection<T> {
 
+    /**
+     * Asynchronously finds multiple elements that match the provided [filter] and processes them using
+     * the provided [cursorSupplier] and [callBack].
+     *
+     * @param filter The [Filter] to apply to the elements.
+     * @param cursorSupplier A supplier that provides a cursor to iterate over the filtered elements.
+     * @param callBack The callback to handle the result.
+     */
     override fun multiAsync(
         filter: Filter<T>,
         cursorSupplier: CursorSupplier<T, Cursor<T>>,
@@ -49,6 +68,13 @@ abstract class AbstractCollection<T>
         }
     }
 
+    /**
+     * Asynchronously finds a single element that matches the provided [supplier] filter and processes it
+     * using the provided [documentCallBack].
+     *
+     * @param supplier The [Filter] to apply to the elements.
+     * @param documentCallBack The callback to handle the result.
+     */
     override fun singleAsync(supplier: Filter<T>, documentCallBack: AsyncCallBack<T>) {
         try {
             val completableFuture = CompletableFuture.runAsync(
@@ -71,19 +97,46 @@ abstract class AbstractCollection<T>
         }
     }
 
+    /**
+     * Finds and returns a cursor containing all elements that match the provided [filter].
+     *
+     * @param filter The [Filter] to apply to the elements.
+     * @param cursorSupplier A supplier that provides a cursor to iterate over the filtered elements.
+     * @return A [Cursor] containing the elements that match the filter.
+     */
     override fun multi(filter: Filter<T>, cursorSupplier: CursorSupplier<T, Cursor<T>>): Cursor<T> {
         return cursorSupplier.create(elements.stream().filter { document: T -> filter.matches(document) }.toList())
     }
 
+    /**
+     * Finds and returns a single element that matches the provided [supplier] filter.
+     *
+     * @param supplier The [Filter] to apply to the elements.
+     * @return The first element that matches the filter, or null if no match is found.
+     */
     override fun single(supplier: Filter<T>): T {
         return elements.stream().filter { document: T -> supplier.matches(document) }.findFirst().orElse(null)
     }
 
+    /**
+     * Replaces a single element that matches the provided [filter] with a new [element].
+     *
+     * @param filter The [Filter] to find the element to replace.
+     * @param element The new element to insert in place of the matched element.
+     */
     override fun replaceOne(filter: Filter<T>, element: T) {
         elements.removeIf { document: T -> filter.matches(document) }
         elements.add(element)
     }
 
+    /**
+     * Asynchronously replaces a single element that matches the provided [filter] with a new [element],
+     * and notifies the provided [listener] of success or failure.
+     *
+     * @param filter The [Filter] to find the element to replace.
+     * @param element The new element to insert in place of the matched element.
+     * @param listener The listener to handle the result of the operation.
+     */
     override fun replaceOneAsync(filter: Filter<T>, element: T, listener: DatabaseListener) {
         try {
             val completableFuture = CompletableFuture.runAsync(
@@ -102,10 +155,25 @@ abstract class AbstractCollection<T>
         }
     }
 
+    /**
+     * Updates a single element that matches the provided [filter] with a new [element].
+     * Currently, this method doesn't implement the update logic and is a placeholder for future development.
+     *
+     * @param filter The [Filter] to find the element to update.
+     * @param element The new element to replace the matched element.
+     */
     override fun updateOne(filter: Filter<T>, element: T) {
         // todo update fields in filter
     }
 
+    /**
+     * Asynchronously updates a single element that matches the provided [filter] with a new [element],
+     * and notifies the provided [listener] of success or failure.
+     *
+     * @param filter The [Filter] to find the element to update.
+     * @param element The new element to replace the matched element.
+     * @param listener The listener to handle the result of the update operation.
+     */
     override fun updateOneAsync(filter: Filter<T>, element: T, listener: DatabaseListener) {
         try {
             val completableFuture = CompletableFuture.runAsync(
@@ -119,16 +187,32 @@ abstract class AbstractCollection<T>
         }
     }
 
+    /**
+     * Deletes a single element from the collection.
+     *
+     * @param element The element to delete from the collection.
+     */
     override fun deleteOne(element: T) {
         elements.remove(element)
     }
 
+    /**
+     * Deletes multiple elements from the collection.
+     *
+     * @param element The array of elements to delete.
+     */
     override fun deleteMany(element: Array<T>) {
         for (current in element) {
             elements.remove(current)
         }
     }
 
+    /**
+     * Asynchronously deletes a single element from the collection and notifies the provided [listener] of success or failure.
+     *
+     * @param element The element to delete from the collection.
+     * @param listener The listener to handle the result of the deletion.
+     */
     override fun deleteOneAsync(element: T, listener: DatabaseListener) {
         try {
             val completableFuture = CompletableFuture.runAsync(
@@ -145,6 +229,12 @@ abstract class AbstractCollection<T>
         }
     }
 
+    /**
+     * Asynchronously deletes multiple elements from the collection and notifies the provided [listener] of success or failure.
+     *
+     * @param element The array of elements to delete.
+     * @param listener The listener to handle the result of the deletion.
+     */
     override fun deleteManyAsync(element: Array<T>, listener: DatabaseListener) {
         try {
             val completableFuture = CompletableFuture.runAsync(
@@ -163,10 +253,21 @@ abstract class AbstractCollection<T>
         }
     }
 
+    /**
+     * Inserts a single element into the collection.
+     *
+     * @param element The element to insert.
+     */
     override fun insertOne(element: T) {
         elements.add(element)
     }
 
+    /**
+     * Asynchronously inserts a single element into the collection and notifies the provided [listener] of success.
+     *
+     * @param element The element to insert.
+     * @param listener The listener to handle the result of the insertion.
+     */
     override fun insertOneAsync(element: T, listener: DatabaseListener) {
         try {
             val completableFuture = CompletableFuture.runAsync(
@@ -183,6 +284,11 @@ abstract class AbstractCollection<T>
         }
     }
 
+    /**
+     * Returns a string representation of the collection, including its elements, id, and name.
+     *
+     * @return A string representation of the collection.
+     */
     override fun toString(): String {
         return "AbstractCollection{" +
                 "elements=" + elements +
