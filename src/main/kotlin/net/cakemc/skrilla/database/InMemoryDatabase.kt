@@ -5,19 +5,24 @@ import net.cakemc.skrilla.database.lookup.LookupIterator
 import net.cakemc.skrilla.database.segment.*
 import net.cakemc.skrilla.database.imdb.*
 import net.cakemc.skrilla.database.exceptions.*
+import net.cakemc.skrilla.database.imdb.Constants.maxSegments
 import java.io.*
+import java.nio.file.Files
+import java.nio.file.Path
 import java.util.*
 import java.util.concurrent.*
 import java.util.concurrent.atomic.*
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.collections.ArrayList
 import kotlin.concurrent.Volatile
+import kotlin.io.path.exists
+import kotlin.io.path.isDirectory
 
 /**
  * InMemoryDatabase represents an in-memory database with a persistent storage backend.
  * It supports basic database operations like PUT, GET, REMOVE, and snapshot creation.
  */
-class InMemoryDatabase {
+class InMemoryDatabase: AbstractMemoryDatabase() {
 
     // Lock to ensure thread-safety when accessing and modifying the database
     private val dbLock: ReentrantLock = ReentrantLock(false)
@@ -35,7 +40,7 @@ class InMemoryDatabase {
     @Volatile
     var state: DatabaseState? = null
     var deleter: Deleter? = null
-    var path: String? = null
+    var path: Path? = null
     private var lockFile: LockFile? = null
     private var options: Options? = null
     var error: Exception? = null
@@ -50,7 +55,7 @@ class InMemoryDatabase {
      * @throws IOException if an I/O error occurs
      */
     @Throws(IOException::class)
-    fun get(key: ByteArray): ByteArray? {
+    override fun get(key: ByteArray): ByteArray? {
         if (!open) throw DatabaseClosedException()
         if (key.size == 0 || key.size > 1024) throw IOException("Invalid key length")
         val value = state!!.multi!![key]
@@ -70,7 +75,7 @@ class InMemoryDatabase {
      * @throws IOException if an I/O error occurs
      */
     @Throws(IOException::class)
-    fun put(key: ByteArray, value: ByteArray) {
+    override fun put(key: ByteArray, value: ByteArray) {
         lock()
         try {
             if (!open) throw DatabaseClosedException()
@@ -93,7 +98,7 @@ class InMemoryDatabase {
      * @throws IOException if an I/O error occurs
      */
     @Throws(IOException::class)
-    fun remove(key: ByteArray): ByteArray? {
+    override fun remove(key: ByteArray): ByteArray? {
         lock()
         try {
             if (!open) throw DatabaseClosedException()
@@ -137,7 +142,7 @@ class InMemoryDatabase {
      * @throws IOException if an I/O error occurs
      */
     @Throws(IOException::class)
-    fun snapshot(): Snapshot {
+    override fun snapshot(): Snapshot {
         lock()
         try {
             if (!open) {
@@ -210,7 +215,7 @@ class InMemoryDatabase {
     /**
      * Returns the statistics for the current database.
      */
-    fun stats(): Statistics {
+    override fun stats(): Statistics {
         lock()
         try {
             val stats = Statistics()
@@ -228,7 +233,7 @@ class InMemoryDatabase {
      * @throws IOException if there are I/O errors during the close operation
      */
     @Throws(DatabaseException::class, IOException::class)
-    fun close() {
+    override fun close() {
         closeWithMerge(options!!.maxSegments)
     }
 
@@ -308,14 +313,14 @@ class InMemoryDatabase {
 
         // Executor service for asynchronous background operations
         val executor: ExecutorService = Executors.newCachedThreadPool { runnable ->
-            val thread = Thread(runnable, "db executorService")
+            val thread = Thread(runnable, "in-memory-executor")
             thread.isDaemon = true
             thread
         }
 
         // Default memory and segment configuration
-        private const val dbMemorySegment = 1024 * 1024
-        private const val dbMaxSegments = 8
+        private const val memorySegmentSize = 1024 * 1024
+        private const val maxSegments = 8
 
         /**
          * Opens a database located at the specified path with the provided options.
@@ -327,13 +332,13 @@ class InMemoryDatabase {
          */
         @JvmStatic
         @Throws(DatabaseException::class)
-        fun open(path: String, options: Options): InMemoryDatabase {
+        fun create(path: Path, options: Options): InMemoryDatabase {
             val copy = options.clone()
             synchronized(globalLock) {
                 try {
-                    return openImpl(path, copy)
+                    return createImplementation(path, copy)
                 } catch (e: DatabaseNotFound) {
-                    if (options.createIfNeeded) return create(path, copy)
+                    if (options.createIfNeeded) return create0(path, copy)
                     throw e
                 }
             }
@@ -348,10 +353,13 @@ class InMemoryDatabase {
          * @throws DatabaseException if an error occurs during creation
          */
         @Throws(DatabaseException::class)
-        private fun create(path: String, options: Options): InMemoryDatabase {
-            val dir = File(path)
-            if (!dir.mkdirs()) throw DatabaseException("Unable to create directories.")
-            return openImpl(path, options)
+        private fun create0(path: Path, options: Options): InMemoryDatabase {
+            try {
+                Files.createDirectories(path)
+            } catch (e: IOException) {
+                throw DatabaseException("Unable to create directories.")
+            }
+            return createImplementation(path, options)
         }
 
         /**
@@ -363,12 +371,12 @@ class InMemoryDatabase {
          * @throws DatabaseException if an error occurs during opening
          */
         @Throws(DatabaseException::class)
-        private fun openImpl(path: String, options: Options): InMemoryDatabase {
-            checkValidDatabase(path)
+        private fun createImplementation(path: Path, options: Options): InMemoryDatabase {
+            validateDatabase(path)
 
             var lockFile: LockFile? = null
             try {
-                lockFile = LockFile("$path/lockfile")
+                lockFile = LockFile(path.resolve("lockfile"))
             } catch (e: IOException) {
                 throw DatabaseOpenFailed(e)
             }
@@ -406,11 +414,11 @@ class InMemoryDatabase {
             database.state = DatabaseState(segments, memory, multi)
 
             // Ensure memory and segment settings are adequate
-            if (options.maxMemoryBytes < dbMemorySegment) {
-                options.maxMemoryBytes = dbMemorySegment
+            if (options.maxMemoryBytes < memorySegmentSize) {
+                options.maxMemoryBytes = memorySegmentSize
             }
-            if (options.maxSegments < dbMaxSegments) {
-                options.maxSegments = dbMaxSegments
+            if (options.maxSegments < maxSegments) {
+                options.maxSegments = maxSegments
             }
 
             // If auto-merge is enabled, start the background merge process
@@ -436,16 +444,18 @@ class InMemoryDatabase {
          * @throws DatabaseInvalid if the database is invalid
          */
         @Throws(DatabaseNotFound::class, DatabaseInvalid::class)
-        private fun checkValidDatabase(path: String) {
-            val file = File(path)
-            if (!file.exists()) throw DatabaseNotFound()
-            if (!file.isDirectory) throw DatabaseInvalid()
+        private fun validateDatabase(path: Path) {
+            if (!Files.exists(path)) throw DatabaseNotFound()
+            if (!Files.isDirectory(path)) throw DatabaseInvalid()
 
-            file.listFiles()?.forEach { file ->
-                when (file.name) {
-                    "lockfile", "deleted" -> return@forEach
-                    else -> if (!file.name.matches("(log|keys|data)\\..*".toRegex())) {
-                        throw DatabaseInvalid()
+            Files.list(path).use { stream ->
+                stream.forEach { file ->
+                    val name = file.fileName.toString()
+                    when (name) {
+                        "lockfile", "deleted" -> return@forEach
+                        else -> if (!name.matches(Regex("(log|keys|data)\\..*"))) {
+                            throw DatabaseInvalid()
+                        }
                     }
                 }
             }
@@ -459,13 +469,13 @@ class InMemoryDatabase {
          */
         @JvmStatic
         @Throws(DatabaseException::class)
-        fun remove(path: String) {
+        fun deleteMemoryLock(path: Path) {
             synchronized(globalLock) {
-                checkValidDatabase(path)
-                val lockFile = LockFile("$path/lockfile")
+                validateDatabase(path)
+                val lockFile = LockFile(path.resolve("lockfile"))
                 if (!lockFile.tryLock()) throw DatabaseInUseException()
 
-                purgeDirectory(File(path))
+                purgeDirectory(path)
             }
         }
 
@@ -474,11 +484,13 @@ class InMemoryDatabase {
          *
          * @param dir The directory to purge
          */
-        private fun purgeDirectory(dir: File) {
-            if (dir.exists() && dir.isDirectory) {
-                dir.listFiles()?.forEach { file ->
-                    if (file.isDirectory) purgeDirectory(file) // Recursive call for subdirectories
-                    file.delete() // Attempt to delete the file
+        private fun purgeDirectory(dir: Path) {
+            if (Files.exists(dir) && Files.isDirectory(dir)) {
+                Files.list(dir).use { stream ->
+                    stream.forEach { path ->
+                        if (Files.isDirectory(path)) purgeDirectory(path)
+                        Files.deleteIfExists(path)
+                    }
                 }
             }
         }

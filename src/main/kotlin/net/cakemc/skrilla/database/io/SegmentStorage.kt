@@ -5,6 +5,8 @@ import net.cakemc.skrilla.database.segment.DiskSegment
 import net.cakemc.skrilla.database.lookup.LookupIterator
 import net.cakemc.skrilla.database.segment.MemorySegment
 import java.io.*
+import java.nio.file.Files
+import java.nio.file.Path
 
 /**
  * Handles operations related to storing and managing segments on disk.
@@ -14,13 +16,13 @@ internal object SegmentStorage {
     /**
      * Writes a segment to disk and returns a corresponding [DiskSegment].
      *
-     * @param dbPath the path of the database where the segment should be stored.
+     * @param path the path of the database where the segment should be stored.
      * @param segment the [MemorySegment] to be written to disk.
      * @return a [DiskSegment] if the segment was successfully written, or `null` if the segment is empty.
      * @throws IOException if an I/O error occurs during the writing process.
      */
     @Throws(IOException::class)
-    fun writeSegmentToDisk(dbPath: String?, segment: MemorySegment): net.cakemc.skrilla.database.segment.DiskSegment? {
+    fun writeSegmentToDisk(path: Path?, segment: MemorySegment): DiskSegment? {
         val iterator = segment.lookup(null, null)
 
         if (iterator.peekKey() == null) {
@@ -31,10 +33,10 @@ internal object SegmentStorage {
         val lowerId = segment.lowerID()
         val upperId = segment.upperID()
 
-        val keyFilename = "$dbPath/keys.$lowerId.$upperId"
-        val dataFilename = "$dbPath/data.$lowerId.$upperId"
+        val keyFile = path!!.resolve("keys.$lowerId.$upperId")
+        val dataFile = path.resolve("data.$lowerId.$upperId")
 
-        val diskSegment = writeAndLoadSegment(keyFilename, dataFilename, iterator, false)
+        val diskSegment = writeAndLoadSegment(keyFile, dataFile, iterator, false)
         segment.removeSegment()
         return diskSegment
     }
@@ -49,29 +51,31 @@ internal object SegmentStorage {
      * @return the corresponding [DiskSegment] created from the segment files.
      * @throws IOException if an I/O error occurs during the process.
      */
+
     @Throws(IOException::class)
     fun writeAndLoadSegment(
-        keyFilename: String,
-        dataFilename: String,
+        keyPath: Path,
+        dataPath: Path,
         iterator: LookupIterator,
         removeDeleted: Boolean
-    ): net.cakemc.skrilla.database.segment.DiskSegment {
-        val keyFileTmp = File("$keyFilename.tmp")
-        val dataFileTmp = File("$dataFilename.tmp")
+    ): DiskSegment {
+        val keyFileTmp = keyPath.resolveSibling("${keyPath.fileName}.tmp")
+        val dataFileTmp = dataPath.resolveSibling("${dataPath.fileName}.tmp")
 
         val keyIndex: List<ByteArray?> = try {
-            writeSegmentFiles(keyFileTmp, dataFileTmp, iterator, removeDeleted)
+            writeSegmentFiles(keyFileTmp.toFile(), dataFileTmp.toFile(), iterator, removeDeleted)
         } catch (e: IOException) {
-            keyFileTmp.delete()
-            dataFileTmp.delete()
+            Files.deleteIfExists(keyFileTmp)
+            Files.deleteIfExists(dataFileTmp)
             throw e
         }
 
-        keyFileTmp.renameTo(File(keyFilename))
-        dataFileTmp.renameTo(File(dataFilename))
+        Files.move(keyFileTmp, keyPath)
+        Files.move(dataFileTmp, dataPath)
 
-        return net.cakemc.skrilla.database.segment.DiskSegment(keyFilename, dataFilename, keyIndex)
+        return DiskSegment(keyPath.toString(), dataPath.toString(), keyIndex)
     }
+
 
     /**
      * Writes the segment data to temporary files and returns a list of key indices.
@@ -112,7 +116,6 @@ internal object SegmentStorage {
             keyCount++
             dataWriter.write(value)
 
-            // Check if key fits in current block
             if (keyBlockLength + 2 + key.size + 8 + 4 >= Constants.keyBlockSize - 2) {
                 keyWriter.writeShort(Constants.endOfBlock)
                 keyBlockLength += 2
@@ -121,7 +124,6 @@ internal object SegmentStorage {
                 previousKey = null
             }
 
-            // Add key to index if needed
             if (keyBlockLength == 0 && block % Constants.keyIndexInterval == 0) {
                 keyIndex.add(key.clone())
             }
@@ -140,7 +142,6 @@ internal object SegmentStorage {
             dataOffset += value.size
         }
 
-        // Pad final key block
         if (keyBlockLength in 1 until Constants.keyBlockSize) {
             keyWriter.writeShort(Constants.endOfBlock)
             keyBlockLength += 2

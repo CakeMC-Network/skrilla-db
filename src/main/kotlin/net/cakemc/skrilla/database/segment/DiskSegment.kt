@@ -140,7 +140,7 @@ internal class DiskSegment(
     override fun lookup(lower: ByteArray?, upper: ByteArray?): LookupIterator? {
         if (size == 0L) return EMPTY
 
-        val ctx = net.cakemc.skrilla.database.segment.DiskSegment.ScanContext()
+        val ctx = ScanContext()
         var block = 0L
         lower?.let {
             val lh = indexSearch(it) ?: return EMPTY
@@ -157,7 +157,7 @@ internal class DiskSegment(
      * Registers the segment to be removed on finalization (i.e., when the object is garbage collected).
      */
     override fun removeOnFinalize() {
-        Deleter.removeOnFinalize(this, net.cakemc.skrilla.database.segment.DiskSegment.Companion.createRemovable(this))
+        Deleter.removeOnFinalize(this, DiskSegment.createRemovable(this))
     }
 
     /**
@@ -176,15 +176,15 @@ internal class DiskSegment(
      */
     fun getFileName(filepath: String): String = Path.of(filepath).fileName.toString()
 
-    private fun binarySearch(key: ByteArray): net.cakemc.skrilla.database.segment.DiskSegment.OffsetLen? {
-        val ctx = net.cakemc.skrilla.database.segment.DiskSegment.Companion.bufferCache.get().apply { reset() }
+    private fun binarySearch(key: ByteArray): DiskSegment.OffsetLen? {
+        val ctx = DiskSegment.Companion.bufferCache.get().apply { reset() }
         val lh = indexSearch(key) ?: return null
         val block = binarySearch0(lh.low, lh.high, key, ctx)
         return scanBlock(block, key, ctx)
     }
 
-    fun indexSearch(key: ByteArray?): net.cakemc.skrilla.database.segment.DiskSegment.LowHigh {
-        if (keyIndex.isEmpty()) return net.cakemc.skrilla.database.segment.DiskSegment.LowHigh(0, keyBlocks - 1)
+    fun indexSearch(key: ByteArray?): LowHigh {
+        if (keyIndex.isEmpty()) return LowHigh(0, keyBlocks - 1)
 
         var index = Collections.binarySearch(keyIndex, key) { o1, o2 -> Arrays.compare(o1, o2) }
         val lowBlock: Long
@@ -199,26 +199,26 @@ internal class DiskSegment(
             highBlock = (lowBlock + Constants.keyIndexInterval).coerceAtMost(keyBlocks - 1)
         }
 
-        return net.cakemc.skrilla.database.segment.DiskSegment.LowHigh(lowBlock, highBlock)
+        return LowHigh(lowBlock, highBlock)
     }
 
-    fun binarySearch0(lowBlock: Long, highBlock: Long, key: ByteArray, ctx: net.cakemc.skrilla.database.segment.DiskSegment.ScanContext): Long {
+    fun binarySearch0(lowBlock: Long, highBlock: Long, key: ByteArray, ctx: ScanContext): Long {
         if (highBlock - lowBlock <= 1) {
             keyFile.readAt(ctx.buffer, highBlock * Constants.keyBlockSize, Constants.maxKeySize + 2)
-            return if (net.cakemc.skrilla.database.segment.DiskSegment.Companion.compareKeys(key, ctx.buffer) < 0) lowBlock else highBlock
+            return if (compareKeys(key, ctx.buffer) < 0) lowBlock else highBlock
         }
 
         val midBlock = (lowBlock + highBlock) / 2
         keyFile.readAt(ctx.buffer, midBlock * Constants.keyBlockSize, Constants.maxKeySize + 2)
 
-        return if (net.cakemc.skrilla.database.segment.DiskSegment.Companion.compareKeys(key, ctx.buffer) < 0) {
+        return if (compareKeys(key, ctx.buffer) < 0) {
             binarySearch0(lowBlock, midBlock - 1, key, ctx)
         } else {
             binarySearch0(midBlock, highBlock, key, ctx)
         }
     }
 
-    fun scanBlock(block: Long, key: ByteArray, ctx: net.cakemc.skrilla.database.segment.DiskSegment.ScanContext): net.cakemc.skrilla.database.segment.DiskSegment.OffsetLen? {
+    fun scanBlock(block: Long, key: ByteArray, ctx: ScanContext): DiskSegment.OffsetLen? {
         ctx.reset()
         keyFile.readAt(ctx.buffer, block * Constants.keyBlockSize, Constants.keyBlockSize)
 
@@ -228,7 +228,7 @@ internal class DiskSegment(
 
             CompressedKey.decodeKey(ctx.key, keyLen, ctx.`is`)
             when (ctx.key.compare(key)) {
-                0 -> return net.cakemc.skrilla.database.segment.DiskSegment.OffsetLen(
+                0 -> return DiskSegment.OffsetLen(
                     ctx.`is`.readLong(),
                     ctx.`is`.readInt()
                 )
@@ -270,8 +270,8 @@ internal class DiskSegment(
     }
 
     companion object {
-        val bufferCache: ThreadLocal<net.cakemc.skrilla.database.segment.DiskSegment.ScanContext> = object : ThreadLocal<net.cakemc.skrilla.database.segment.DiskSegment.ScanContext>() {
-            override fun initialValue() = net.cakemc.skrilla.database.segment.DiskSegment.ScanContext()
+        val bufferCache: ThreadLocal<ScanContext> = object : ThreadLocal<ScanContext>() {
+            override fun initialValue() = ScanContext()
         }
 
         /**
@@ -297,15 +297,36 @@ internal class DiskSegment(
         /**
          * Removes a file if it exists, throwing an IOException if it cannot be deleted.
          *
-         * @param path The path to the file.
-         * @param filename The name of the file.
+         * @param path The directory path.
+         * @param filename The name of the file within the directory.
          * @throws IOException if the file cannot be deleted.
          */
         @Throws(IOException::class)
-        fun removeFileIfExists(path: String?, filename: String) {
-            val file = File(path, filename)
-            if (file.exists() && !file.delete()) {
-                throw IOException("Unable to delete $file")
+        fun removeFileIfExists(path: Path, filename: String) {
+            val file = path.resolve(filename)
+            try {
+                if (Files.exists(file) && !Files.deleteIfExists(file)) {
+                    throw IOException("Unable to delete $file")
+                }
+            } catch (e: IOException) {
+                throw IOException("Unable to delete $file", e)
+            }
+        }
+
+        /**
+         * Removes a file if it exists, throwing an IOException if it cannot be deleted.
+         *
+         * @param path The directory path.
+         * @throws IOException if the file cannot be deleted.
+         */
+        @Throws(IOException::class)
+        fun removeFileIfExists(file: Path) {
+            try {
+                if (Files.exists(file) && !Files.deleteIfExists(file)) {
+                    throw IOException("Unable to delete $file")
+                }
+            } catch (e: IOException) {
+                throw IOException("Unable to delete $file", e)
             }
         }
 
@@ -345,42 +366,44 @@ internal class DiskSegment(
          * @param options The options to be used when loading the segments.
          * @return A list of loaded segments.
          */
-        fun loadDiskSegments(path: String, options: Options): List<Segment> {
+        fun loadDiskSegments(path: Path, options: Options): List<Segment> {
             val segments = mutableListOf<Segment>()
-            val dir = File(path)
-            require(dir.isDirectory) { "$path is not a directory" }
+
+            require(Files.isDirectory(path)) { "$path is not a directory" }
 
             // Clean up orphaned temp files
-            dir.listFiles()?.forEach { file ->
-                if (!file.name.endsWith(".tmp")) return@forEach
-                val base = net.cakemc.skrilla.database.segment.DiskSegment.Companion.trimSuffix(file.name, ".tmp").let {
-                    if (it.startsWith("keys.")) net.cakemc.skrilla.database.segment.DiskSegment.Companion.trimPrefix(
-                        it,
-                        "keys."
-                    ) else net.cakemc.skrilla.database.segment.DiskSegment.Companion.trimPrefix(it, "data.")
-                }
-                listOf("keys", "data").forEach { type ->
-                    net.cakemc.skrilla.database.segment.DiskSegment.Companion.removeFileIfExists(path, "$type.$base")
-                    net.cakemc.skrilla.database.segment.DiskSegment.Companion.removeFileIfExists(
-                        path,
-                        "$type.$base.tmp"
-                    )
+            Files.list(path).use { files ->
+                files.forEach { file ->
+                    val fileName = file.fileName.toString()
+                    if (!fileName.endsWith(".tmp")) return@forEach
+
+                    val base = DiskSegment.trimSuffix(fileName, ".tmp").let {
+                        if (it.startsWith("keys.")) trimPrefix(it, "keys.")
+                        else trimPrefix(it, "data.")
+                    }
+
+                    listOf("keys", "data").forEach { type ->
+                        removeFileIfExists(path.resolve("$type.$base"))
+                        removeFileIfExists(path.resolve("$type.$base.tmp"))
+                    }
                 }
             }
 
-            dir.listFiles()?.forEach { file ->
-                when {
-                    file.name.startsWith("log.") -> segments.add(LogSegment(file.path, options))
-                    file.name.startsWith("keys.") -> {
-                        val segs =
-                            net.cakemc.skrilla.database.segment.DiskSegment.Companion.trimPrefix(file.name, "keys.")
-                        segments.add(
-                            net.cakemc.skrilla.database.segment.DiskSegment(
-                                "$path/keys.$segs",
-                                "$path/data.$segs",
-                                null
+            Files.list(path).use { files ->
+                files.forEach { file ->
+                    val name = file.fileName.toString()
+                    when {
+                        name.startsWith("log.") -> segments.add(LogSegment(file.toString(), options))
+                        name.startsWith("keys.") -> {
+                            val segs = trimPrefix(name, "keys.")
+                            segments.add(
+                                DiskSegment(
+                                    path.resolve("keys.$segs").toString(),
+                                    path.resolve("data.$segs").toString(),
+                                    null
+                                )
                             )
-                        )
+                        }
                     }
                 }
             }
@@ -405,13 +428,14 @@ internal class DiskSegment(
             return segments
         }
 
+
         /**
          * Creates a Removable for the DiskSegment, allowing it to be cleaned up later.
          *
          * @param ds The DiskSegment to be removed.
          * @return A Removable instance for the segment.
          */
-        private fun createRemovable(ds: net.cakemc.skrilla.database.segment.DiskSegment): Removable = object :
+        private fun createRemovable(ds: DiskSegment): Removable = object :
             Removable {
             override fun remove() {
                 ds.keyFile.close()

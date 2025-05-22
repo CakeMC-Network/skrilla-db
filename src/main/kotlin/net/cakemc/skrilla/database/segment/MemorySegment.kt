@@ -5,6 +5,7 @@ import net.cakemc.skrilla.database.io.Deleter
 import net.cakemc.skrilla.database.io.LogFile
 import net.cakemc.skrilla.database.lookup.LookupIterator
 import java.io.IOException
+import java.nio.file.Path
 import java.util.concurrent.ConcurrentSkipListMap
 
 /**
@@ -19,7 +20,7 @@ import java.util.concurrent.ConcurrentSkipListMap
  * @param options the database options used for key comparison
  */
 class MemorySegment(
-    private val path: String?,
+    private val path: Path?,
     private val id: Long,
     private val options: Options
 ) : Segment {
@@ -159,18 +160,12 @@ class MemorySegment(
      */
     @Throws(IOException::class)
     private fun maybeCreateLogFile() {
-        if (logFile != null || path.isNullOrEmpty()) return
+        if (logFile != null || path == null) return
         logFile = LogFile(path, id, options)
     }
 
-    companion object {
 
-        /**
-         * Creates an in-memory segment with no backing file and default options.
-         *
-         * @return a new memory-only segment
-         */
-        fun newMemoryOnlySegment(): MemorySegment = MemorySegment("", 0, Options())
+    companion object {
 
         /**
          * Returns a LookupIterator over a specified range of the given map.
@@ -186,10 +181,10 @@ class MemorySegment(
             list: ConcurrentSkipListMap<ByteArray, ByteArray>
         ): LookupIterator {
             return when {
-                lower == null && upper == null -> net.cakemc.skrilla.database.segment.MemorySegmentIterator(list)
-                lower == null -> net.cakemc.skrilla.database.segment.MemorySegmentIterator(list.headMap(upper, true))
-                upper == null -> net.cakemc.skrilla.database.segment.MemorySegmentIterator(list.tailMap(lower, true))
-                else -> net.cakemc.skrilla.database.segment.MemorySegmentIterator(list.subMap(lower, true, upper, true))
+                lower == null && upper == null -> MemorySegmentIterator(list)
+                lower == null -> MemorySegmentIterator(list.headMap(upper, true))
+                upper == null -> MemorySegmentIterator(list.tailMap(lower, true))
+                else -> MemorySegmentIterator(list.subMap(lower, true, upper, true))
             }
         }
 

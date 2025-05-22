@@ -14,7 +14,7 @@ import java.util.stream.Collectors
  *
  * @param path The directory path where the deleted files list will be stored and used for file deletions.
  */
-class PendingFileDeleter(private val path: String) : Deleter {
+class PendingFileDeleter(private val path: Path) : Deleter {
     private var file: OutputStream? = null
 
     /**
@@ -41,7 +41,7 @@ class PendingFileDeleter(private val path: String) : Deleter {
             file = DataOutputStream(
                 UnSyncedBufferedOutputStream(
                     Files.newOutputStream(
-                        Path.of("$path/deleted"),
+                        path.resolve("deleted"),
                         *fileOptions.toTypedArray()
                     )
                 )
@@ -67,7 +67,7 @@ class PendingFileDeleter(private val path: String) : Deleter {
         file?.close()
         file = null
 
-        val deletedFilePath = Path.of("$path/deleted")
+        val deletedFilePath =  path.resolve("deleted")
         if (!Files.exists(deletedFilePath)) return
 
         val files = Files.lines(deletedFilePath)
@@ -75,7 +75,7 @@ class PendingFileDeleter(private val path: String) : Deleter {
             .collect(Collectors.toList())
 
         for (fname in files) {
-            Files.deleteIfExists(Path.of(path, fname))
+            Files.deleteIfExists(path.resolve(fname))
         }
 
         Files.deleteIfExists(deletedFilePath)

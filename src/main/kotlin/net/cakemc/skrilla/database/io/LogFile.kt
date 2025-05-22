@@ -19,11 +19,13 @@ import java.util.concurrent.ConcurrentSkipListMap
  * @param id The unique identifier for the log file.
  * @param options The options containing settings such as synchronization and flushing behavior.
  */
-internal class LogFile(path: String?, id: Long, options: Options) {
-    var filepath: Path = Path.of("$path/log.$id")
+internal class LogFile(val path: Path, id: Long, options: Options) {
+    var filepath: Path = path.resolve("log.$id")
+
     private val w: DataOutputStream
     private val id: Long = id
     private var inBatch = false
+
     private val syncWrite = options.enableSyncWrite
     private var disableFlush = options.disableWriteFlush && !syncWrite
 

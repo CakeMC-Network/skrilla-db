@@ -47,7 +47,7 @@ open class DefaultDatabase(val folder: Path) : AbstractDatabase() {
 
     private val indexes: MutableMap<String, Index> = ConcurrentHashMap()
 
-    private val MAX_DOCUMENTS_PER_FILE = 10000
+    private val MAX_DOCUMENTS_PER_FILE = 300
 
     /**
      * Retrieves or lazily creates a collection with the given name.

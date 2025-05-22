@@ -12,8 +12,7 @@ import java.nio.file.StandardOpenOption
  *
  * @param path The path of the file to lock.
  */
-class LockFile(path: String) {
-    private val path: Path = Path.of(path)
+class LockFile(val path: Path) {
     var fch: FileChannel? = null
         private set
     private var lock: FileLock? = null

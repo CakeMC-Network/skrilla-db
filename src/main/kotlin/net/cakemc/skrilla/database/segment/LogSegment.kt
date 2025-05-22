@@ -1,11 +1,3 @@
-/**
- * Represents a read-only log segment in a key-value storage engine.
- *
- * This segment loads its key-value pairs from an append-only log file,
- * and it supports lookup operations over an in-memory sorted map.
- * Mutation operations are explicitly disallowed to ensure immutability.
- */
-
 package net.cakemc.skrilla.database.segment
 
 import net.cakemc.skrilla.database.imdb.Options
@@ -16,6 +8,7 @@ import net.cakemc.skrilla.database.io.LogFile
 import net.cakemc.skrilla.database.lookup.LookupIterator
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.Paths
 import java.util.concurrent.ConcurrentSkipListMap
 
 /**
@@ -170,10 +163,16 @@ class LogSegment(
     /**
      * Extracts the segment ID from the log file name.
      *
-     * @param path the file name (expects format with ID after first dot)
+     * @param path the full file path (expects format where segment ID is the last numeric part after a dot)
      * @return the parsed segment ID
      * @throws IllegalArgumentException if ID cannot be parsed
      */
-    fun getSegmentId(path: String): Long =
-        path.split(".").getOrNull(1)?.toLongOrNull() ?: throw IllegalArgumentException("Invalid segment ID in $path")
+    fun getSegmentId(path: String): Long {
+        val fileName = Paths.get(path).fileName.toString()
+        val idPart = fileName.split(".").findLast { it.toLongOrNull() != null }
+            ?: throw IllegalArgumentException("Invalid segment ID in $path")
+        return idPart.toLong()
+    }
+
+
 }

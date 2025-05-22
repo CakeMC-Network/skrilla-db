@@ -6,6 +6,7 @@ import net.cakemc.skrilla.database.io.SegmentStorage
 import net.cakemc.skrilla.database.segment.MultiSegment
 import net.cakemc.skrilla.database.segment.Segment
 import java.io.IOException
+import java.nio.file.Path
 import java.util.*
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.LockSupport
@@ -105,7 +106,7 @@ internal object Merger {
 
             segments = segments.subList(index, index + mergable.size)
 
-            val newSegment = mergeSegments1(db.deleter!!, db.path, segments, index == 0)
+            val newSegment = mergeSegments1(db.deleter!!, db.path!!, segments, index == 0)
             db.lock()
             try {
                 segments = db.state!!.segments
@@ -138,29 +139,37 @@ internal object Merger {
      * Merges segments into a new segment and schedules the deletion of the old segments.
      *
      * @param deleter The deleter to schedule deletions.
-     * @param dbpath The path to the database files.
+     * @param path The path to the database files.
      * @param segments The list of segments to merge.
      * @param removeDeleted Flag to determine whether to remove deleted data.
      * @return The newly merged segment.
      * @throws IOException If an error occurs during the merging process.
      */
     @Throws(IOException::class)
-    fun mergeSegments1(deleter: Deleter, dbpath: String?, segments: List<Segment?>, removeDeleted: Boolean): Segment {
+    fun mergeSegments1(
+        deleter: Deleter,
+        path: Path,
+        segments: List<Segment?>,
+        removeDeleted: Boolean
+    ): Segment {
         val lowerId = segments.firstOrNull()?.lowerID()
+            ?: throw IllegalArgumentException("Segments list is empty or contains null")
         val upperId = segments.lastOrNull()?.upperID()
+            ?: throw IllegalArgumentException("Segments list is empty or contains null")
 
-        val keyFilename = String.format("%s/keys.%d.%d", dbpath, lowerId, upperId)
-        val dataFilename = String.format("%s/data.%d.%d", dbpath, lowerId, upperId)
+        val keyPath = path.resolve("keys.$lowerId.$upperId")
+        val dataPath = path.resolve("data.$lowerId.$upperId")
 
         val files = segments.flatMap { it?.files() ?: emptyList() }
 
         val ms = MultiSegment(segments)
         val itr = ms.lookup(null, null)
-        val seg: Segment = SegmentStorage.writeAndLoadSegment(keyFilename, dataFilename, itr, removeDeleted)
+        val seg = SegmentStorage.writeAndLoadSegment(keyPath, dataPath, itr, removeDeleted)
 
         deleter.scheduleDeletion(files)
         return seg
     }
+
 
     /**
      * Returns the index of the element with the minimum value according to the given selector.
