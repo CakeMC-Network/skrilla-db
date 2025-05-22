@@ -67,6 +67,7 @@ class BinCollectionReader : AbstractRead() {
 
         val documentId = dataStream.readLong()
         val documentFlags = dataStream.readInt()
+        val documentFlagsVals = dataStream.readUTF()
         val documentIndex = dataStream.readInt()
 
         val size = dataStream.readInt()
@@ -83,6 +84,12 @@ class BinCollectionReader : AbstractRead() {
                 4 -> dataStream.readDouble()
                 5 -> dataStream.readBoolean()
                 6 -> UUID.fromString(dataStream.readUTF())
+                10 -> {
+                    val objectSize = dataStream.readInt()
+                    val objectBytes = ByteArray(objectSize)
+                    dataStream.readFully(objectBytes)
+                    readElement(objectBytes)
+                }
                 7 -> {
                     val objectSize = dataStream.readInt()
                     val objectBytes = ByteArray(objectSize)
@@ -95,7 +102,9 @@ class BinCollectionReader : AbstractRead() {
             values[key] = value
         }
 
-        return Document(documentIndex, documentFlags, documentId, values)
+        val document = Document(documentIndex, documentFlags, documentId, values)
+        document.deserializeFlagsFromString(documentFlagsVals)
+        return document
     }
 
     /**
@@ -126,6 +135,12 @@ class BinCollectionReader : AbstractRead() {
                 4 -> dataStream.readDouble()
                 5 -> dataStream.readBoolean()
                 6 -> UUID.fromString(dataStream.readUTF())
+                10 -> {
+                    val objectSize = dataStream.readInt()
+                    val objectBytes = ByteArray(objectSize)
+                    dataStream.readFully(objectBytes)
+                    readElement(objectBytes)
+                }
                 7 -> {
                     val objectSize = dataStream.readInt()
                     val objectBytes = ByteArray(objectSize)

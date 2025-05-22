@@ -106,6 +106,12 @@ class BinCollectionWriter : AbstractWrite() {
                     dataStream.writeByte(6)
                     dataStream.writeUTF(value.toString())
                 }
+                is Document -> {
+                    dataStream.writeByte(10)
+                    val documentBytes = serializeDocument(value)
+                    dataStream.writeInt(documentBytes.size)
+                    dataStream.write(documentBytes)
+                }
                 is Serializable -> {
                     dataStream.writeByte(7)
                     val objectStream = ByteArrayOutputStream()

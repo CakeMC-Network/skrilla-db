@@ -43,6 +43,7 @@ class Base64CollectionReader {
                 4 -> dataStream.readDouble()
                 5 -> dataStream.readBoolean()
                 6 -> UUID.fromString(dataStream.readUTF())
+                10 -> readElement(dataStream.readUTF())
                 7 -> {
                     val objectSize = dataStream.readInt()
                     val objectBytes = ByteArray(objectSize)

@@ -143,6 +143,18 @@ class Document(
     }
 
     /**
+     * Adds a document element to the document.
+     *
+     * @param key The key associated with the element.
+     * @param value The document value to add.
+     * @return The updated document.
+     */
+    fun add(key: String, value: Document): Document {
+        elements[key] = value
+        return this
+    }
+
+    /**
      * Sets the value for the specified key, overriding any existing value.
      *
      * @param key The key to set the value for.
@@ -170,16 +182,158 @@ class Document(
         throw ClassCastException("Value for key '$key' is not of type ${type.name}")
     }
 
-    // Methods for getting specific types (e.g., getInt, getLong, etc.) are also documented similarly:
-    // - getInt(key: String)
-    // - getLong(key: String)
-    // - getDouble(key: String)
-    // - getFloat(key: String)
-    // - getBoolean(key: String)
-    // - getChar(key: String)
-    // - getByte(key: String)
-    // - getShort(key: String)
-    // - getString(key: String)
+
+    /**
+     * Gets int.
+     *
+     * @param key the key
+     * @return the int
+     */
+    fun getInt(key: String): Int {
+        val value = elements[key]
+        if (value is Int) {
+            return value
+        }
+        if (value is Double) {
+            return value.toInt()
+        }
+        throw ClassCastException("Value for key '$key' is not of type int.")
+    }
+
+    /**
+     * Gets long.
+     *
+     * @param key the key
+     * @return the long
+     */
+    fun getLong(key: String): Long {
+        val value = elements[key]
+        if (value is Long) {
+            return value
+        }
+        if (value is Double) {
+            return value.toLong()
+        }
+        throw ClassCastException("Value for key '$key' is not of type long.")
+    }
+
+    /**
+     * Gets double.
+     *
+     * @param key the key
+     * @return the double
+     */
+    fun getDouble(key: String): Double {
+        val value = elements[key]
+        if (value is Double) {
+            return value
+        }
+        throw ClassCastException("Value for key '$key' is not of type double.")
+    }
+
+    /**
+     * Gets float.
+     *
+     * @param key the key
+     * @return the float
+     */
+    fun getFloat(key: String): Float {
+        val value = elements[key]
+        if (value is Float) {
+            return value
+        }
+        if (value is Double) {
+            return value.toFloat()
+        }
+        throw ClassCastException("Value for key '$key' is not of type float.")
+    }
+
+    /**
+     * Gets boolean.
+     *
+     * @param key the key
+     * @return the boolean
+     */
+    fun getBoolean(key: String): Boolean {
+        val value = elements[key]
+        if (value is Boolean) {
+            return value
+        }
+        throw ClassCastException("Value for key '$key' is not of type boolean.")
+    }
+
+    /**
+     * Gets char.
+     *
+     * @param key the key
+     * @return the char
+     */
+    fun getChar(key: String): Char {
+        val value = elements[key]
+        if (value is Char) {
+            return value
+        }
+        throw ClassCastException("Value for key '$key' is not of type char.")
+    }
+
+    /**
+     * Gets byte.
+     *
+     * @param key the key
+     * @return the byte
+     */
+    fun getByte(key: String): Byte {
+        val value = elements[key]
+        if (value is Byte) {
+            return value
+        }
+        if (value is Double) {
+            return value.toInt().toByte()
+        }
+        throw ClassCastException("Value for key '$key' is not of type byte.")
+    }
+
+    /**
+     * Gets short.
+     *
+     * @param key the key
+     * @return the short
+     */
+    fun getShort(key: String): Short {
+        val value = elements[key]
+        if (value is Short) {
+            return value
+        }
+        if (value is Double) {
+            return value.toInt().toShort()
+        }
+        throw ClassCastException("Value for key '$key' is not of type short.")
+    }
+
+    /**
+     * Gets string.
+     *
+     * @param key the key
+     * @return the string
+     */
+    fun getString(key: String): String {
+        val value = elements[key]
+        if (value is String) {
+            return value
+        }
+        throw ClassCastException("Value for key '$key' is not of type string.")
+    }
+
+    /**
+     * Retrieves the value associated with the given key and casts it to a Document
+     *
+     * @param key The key to retrieve the value for.
+     * @return The inner document inside the document
+     * @throws ClassCastException if the value is not of the specified type.
+     */
+    fun getDocument(key: String): Document {
+        return get(key, Document::class.java)
+    }
 
     /**
      * Checks if the document contains the specified key.

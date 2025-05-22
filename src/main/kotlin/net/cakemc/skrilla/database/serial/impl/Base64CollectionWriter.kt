@@ -53,6 +53,10 @@ class Base64CollectionWriter {
                     dataStream.writeByte(6)
                     dataStream.writeUTF(value.toString())
                 }
+                is Document -> {
+                    dataStream.write(10)
+                    dataStream.writeUTF(this.serializeDocumentToBase64(document))
+                }
                 is Serializable -> {
                     dataStream.writeByte(7)
                     val objectStream = ByteArrayOutputStream()
