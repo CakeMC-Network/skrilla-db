@@ -5,6 +5,8 @@ import java.lang.reflect.Field
 object DataTrackSerializer {
 
     fun serialize(obj: Any, adapter: ReadWriteAdapter) {
+        if (!obj::class.java.isAnnotationPresent(Trackable::class.java))
+            throw IllegalArgumentException("Trackable Annotation missing for ${obj::class.java.name}")
         val fields = obj.javaClass.declaredFields
         for (field in fields) {
             val annotation = field.getAnnotation(DataTracker::class.java) ?: continue
@@ -16,6 +18,8 @@ object DataTrackSerializer {
     }
 
     fun <T : Any> deserialize(clazz: Class<T>, adapter: ReadWriteAdapter): T {
+        if (!clazz.isAnnotationPresent(Trackable::class.java))
+            throw IllegalArgumentException("Trackable Annotation missing for ${clazz.name}")
         val constructor = clazz.declaredConstructors.firstOrNull()
             ?: throw IllegalArgumentException("No constructor found for ${clazz.name}")
         constructor.isAccessible = true

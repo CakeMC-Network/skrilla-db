@@ -1,7 +1,9 @@
 package testing
 
 import net.cakemc.skrilla.datatrack.DataTracker
+import net.cakemc.skrilla.datatrack.Trackable
 
+@Trackable
 data class TestPerson(
     @DataTracker
     var name: String,
