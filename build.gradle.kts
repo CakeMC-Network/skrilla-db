@@ -20,15 +20,23 @@ dependencies {
         name = "jna",
         version = prop("dep-jna"),
     )
+
     implementation(
         group = "io.netty",
         name = "netty-all",
         version = prop("dep-netty")
     )
+
     implementation(
         group = "com.github.luben",
         name = "zstd-jni",
         version = prop("dep-zstd")
+    )
+
+    implementation(
+        group = "com.google.code.gson",
+        name = "gson",
+        version = prop("dep-gson")
     )
 }
 

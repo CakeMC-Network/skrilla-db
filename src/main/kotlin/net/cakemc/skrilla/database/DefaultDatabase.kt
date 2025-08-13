@@ -261,13 +261,17 @@ open class DefaultDatabase(val folder: Path) : AbstractDatabase() {
         val lines = String(decompressed).split("\n")
 
         val index = Index(LinkedList())
+
         lines.forEach {
-            val parts = it.split("=")
-            val id = parts[0].toLong()
-            val fileOffset = parts[1].split(":")
-            val fileName = fileOffset[0]
-            val offset = fileOffset[1].toLong()
-            index.entries.add(IndexEntry(id, fileName, offset))
+            if (!it.isEmpty()) {
+                val parts = it.split("=")
+                val id = parts[0].toLong()
+                val fileOffset = parts[1].split(":")
+                val fileName = fileOffset[0]
+                val offset = fileOffset[1].toLong()
+                index.entries.add(IndexEntry(id, fileName, offset))
+            }
+
         }
 
         indexes[collectionName] = index

@@ -1,6 +1,7 @@
 package testing
 
 import net.cakemc.database.DefaultDatabase
+import net.cakemc.database.api.Document
 import net.cakemc.database.filter.Filters
 import java.nio.file.Paths
 
@@ -34,4 +35,6 @@ fun create() {
 
     collection.insertOneDocument(document)
     database.save()
+
+    collection.collect().forEach { document: Document ->  println(document.toString()) }
 }

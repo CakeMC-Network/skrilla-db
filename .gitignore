@@ -5,3 +5,6 @@ build/
 out/
 **credentials.properties**
 *.p12
+
+database.json
+secret.key

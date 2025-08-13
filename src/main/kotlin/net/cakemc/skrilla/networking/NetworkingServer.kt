@@ -12,6 +12,7 @@ import io.netty.channel.kqueue.KQueueServerSocketChannel
 import io.netty.channel.nio.NioIoHandler
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.NioServerSocketChannel
+import net.cakemc.skrilla.event.AbstractEventBus
 import net.cakemc.skrilla.networking.codec.BossHandler
 import net.cakemc.skrilla.networking.codec.compress.CompressionDecoder
 import net.cakemc.skrilla.networking.codec.compress.CompressionEncoder
@@ -26,6 +27,7 @@ import javax.crypto.SecretKey
 class NetworkingServer(
     val secretKey: SecretKey,
     val clientHandler: ClientHandler,
+    val eventBus: AbstractEventBus,
     val packetRegistry: PacketRegistry = PacketRegistry()
 ) {
 
@@ -117,7 +119,7 @@ class NetworkingServer(
                             PacketDecoder(packetRegistry),
                             PacketEncoder(packetRegistry),
 
-                            BossHandler(clientHandler)
+                            BossHandler(clientHandler, eventBus)
                         )
                     }
                 })
